@@ -1,0 +1,84 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "Diabetes Prediction ML",
+  "projectDescription": "A machine learning system for diabetes prediction using RandomForest with FastAPI deployment and Docker containerization.",
+  "theme": "palm",
+  "primaryColor": "#46bde6",
+  "lightColor": "#a4e0f1",
+  "darkColor": "#80cee3",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["introduction", "overview/features", "overview/dataset"]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              "getting-started/quickstart",
+              "getting-started/phase-1-notebook",
+              "getting-started/phase-2-cli",
+              "getting-started/phase-3-api"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/model-architecture",
+              "concepts/data-preprocessing",
+              "concepts/patient-features",
+              "concepts/imbalanced-data"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/docker-setup",
+              "deployment/cli-usage",
+              "deployment/api-deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/overview",
+              "api/train",
+              "api/predict"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/patient-model"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "RandomForest classifier for diabetes prediction",
+    "SMOTEENN for handling imbalanced datasets",
+    "FastAPI REST API with Swagger documentation",
+    "Docker containerization for easy deployment",
+    "Three progressive implementation phases",
+    "StandardScaler for feature normalization",
+    "CLI tools for training and prediction",
+    "Support for batch and single predictions"
+  ],
+  "publicApiSurface": [
+    "POST /train - Train the diabetes prediction model",
+    "POST /predict - Make a diabetes prediction for a patient",
+    "Patient(gender, age, hypertension, heart_disease, smoking_history, bmi, HbA1c_level, blood_glucose_level)",
+    "train.py --model_file --data_file --overwrite_model",
+    "predict.py --model_file --input_file --predictions_file"
+  ]
+}
