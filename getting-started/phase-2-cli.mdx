@@ -1,0 +1,700 @@
+---
+title: 'Phase 2: CLI Tools'
+description: 'Command-line interface for training and batch predictions'
+---
+
+## Overview
+
+Phase 2 provides Docker-based command-line tools for training models and making batch predictions. This phase is ideal for automated pipelines, batch processing, and local development.
+
+<Info>
+  **Best For**: Data engineers, MLOps teams, and automated workflows that need to process CSV files in batch mode.
+  
+  **Location**: `~/workspace/source/fase-2/`
+</Info>
+
+## Architecture
+
+Phase 2 consists of two main Python scripts:
+
+<CardGroup cols={2}>
+  <Card title="train.py" icon="graduation-cap">
+    Trains a RandomForestClassifier from CSV data and saves the model to a pickle file
+  </Card>
+  
+  <Card title="predict.py" icon="wand-magic-sparkles">
+    Loads a trained model and generates predictions for new CSV data
+  </Card>
+</CardGroup>
+
+Both scripts run inside a Docker container with all dependencies pre-installed.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Docker Installed">
+    Ensure Docker is installed and running on your system:
+    
+    ```bash
+    docker --version
+    # Should show: Docker version XX.XX.XX
+    ```
+  </Step>
+  
+  <Step title="Dataset Files">
+    You need CSV files from the Kaggle dataset:
+    - `train.csv` - Training data with diabetes column
+    - `test.csv` - Test data (with or without diabetes column)
+    
+    See [Dataset Documentation](/overview/dataset) for download instructions.
+  </Step>
+  
+  <Step title="Source Code">
+    Navigate to the fase-2 directory:
+    
+    ```bash
+    cd ~/workspace/source/fase-2
+    ```
+  </Step>
+</Steps>
+
+## Quick Start
+
+<Steps>
+  <Step title="Build Docker Image">
+    Build the container with all dependencies:
+    
+    ```bash
+    docker build -t ai-proyecto-sustituto .
+    ```
+    
+    This creates an image based on Python 3.12 with:
+    - scikit-learn
+    - pandas
+    - imbalanced-learn
+    - loguru
+    - argparse
+  </Step>
+  
+  <Step title="Run Container">
+    Start an interactive container:
+    
+    ```bash
+    docker run -it --name ai-container ai-proyecto-sustituto /bin/bash
+    ```
+    
+    You're now inside the container at `/app` directory.
+  </Step>
+  
+  <Step title="Copy Data Files">
+    In a **new terminal** (keep the container terminal open), copy your CSV files:
+    
+    ```bash
+    cd ~/workspace/source/resources
+    docker cp train.csv ai-container:/app
+    docker cp test.csv ai-container:/app
+    ```
+  </Step>
+  
+  <Step title="Train the Model">
+    Back in the **container terminal**, train the model:
+    
+    ```bash
+    python train.py --model_file model.pkl --data_file train.csv --overwrite_model
+    ```
+    
+    You'll see logging output:
+    ```
+    overwriting existing model file model.pkl
+    loading train data
+    encoding train data
+    scaling train data
+    fitting model
+    saving model to model.pkl
+    ```
+  </Step>
+  
+  <Step title="Make Predictions">
+    Generate predictions for test data:
+    
+    ```bash
+    python predict.py --model_file model.pkl --input_file test.csv --predictions_file predictions.csv
+    ```
+    
+    Logging output:
+    ```
+    loading input data
+    encoding data
+    scaling data
+    loading model
+    making predictions
+    saving predictions to predictions.csv
+    ```
+  </Step>
+  
+  <Step title="View Results">
+    Check the predictions:
+    
+    ```bash
+    cat predictions.csv
+    ```
+    
+    Output format:
+    ```csv
+    preds
+    0
+    1
+    0
+    0
+    1
+    ```
+  </Step>
+</Steps>
+
+## train.py - Model Training Script
+
+### Command-Line Arguments
+
+```bash
+python train.py [OPTIONS]
+```
+
+| Argument | Required | Type | Description |
+|----------|----------|------|-------------|
+| `--data_file` | Yes | str | Path to CSV file with training data |
+| `--model_file` | Yes | str | Path where trained model will be saved |
+| `--overwrite_model` | No | flag | If set, overwrites existing model file |
+
+### Usage Examples
+
+<CodeGroup>
+```bash Basic Usage
+python train.py --model_file model.pkl --data_file train.csv --overwrite_model
+```
+
+```bash Without Overwrite
+# Will exit with error if model.pkl already exists
+python train.py --model_file model.pkl --data_file train.csv
+```
+
+```bash Different Files
+python train.py --model_file diabetes_model_v2.pkl --data_file full_dataset.csv --overwrite_model
+```
+</CodeGroup>
+
+### Training Process
+
+The script performs these steps:
+
+<Steps>
+  <Step title="Validate Model File">
+    ```python
+    if os.path.isfile(model_file):
+        if overwrite:
+            logger.info(f"overwriting existing model file {model_file}")
+        else:
+            logger.info(f"model file {model_file} exists. exitting. use --overwrite_model option")
+            exit(-1)
+    ```
+    
+    Prevents accidental overwriting of existing models.
+  </Step>
+  
+  <Step title="Load Training Data">
+    ```python
+    logger.info("loading train data")
+    z = pd.read_csv(data_file)
+    ```
+  </Step>
+  
+  <Step title="Encode Categorical Features">
+    ```python
+    logger.info("encoding train data")
+    gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+    smoking_history_dict = {
+        'No Info': 0, 'current': 1, 'ever': 2, 
+        'former': 3, 'never': 4, 'not current': 5
+    }
+    z = z.replace({'gender': gender_dict, 'smoking_history': smoking_history_dict})
+    ```
+  </Step>
+  
+  <Step title="Separate Features and Target">
+    ```python
+    Xtr = z.drop('diabetes', axis=1)
+    ytr = z[['diabetes']]
+    ```
+  </Step>
+  
+  <Step title="Scale Features">
+    ```python
+    logger.info("scaling train data")
+    scaler = StandardScaler()
+    Xtr = scaler.fit_transform(Xtr)
+    ```
+    
+    <Warning>
+      The scaler is fit on training data but not saved. This means predictions must fit their own scaler, which may cause inconsistencies. For production, consider saving the scaler with the model.
+    </Warning>
+  </Step>
+  
+  <Step title="Apply SMOTEENN Resampling">
+    ```python
+    smote_enn = SMOTEENN(random_state=42)
+    Xtr, ytr = smote_enn.fit_resample(Xtr, ytr)
+    ```
+    
+    Balances the imbalanced dataset.
+  </Step>
+  
+  <Step title="Train RandomForest Model">
+    ```python
+    logger.info("fitting model")
+    m = RandomForestClassifier()
+    m.fit(Xtr, ytr)
+    ```
+    
+    Uses default hyperparameters:
+    - `n_estimators=100`
+    - `max_depth=None`
+    - `min_samples_split=2`
+  </Step>
+  
+  <Step title="Save Model">
+    ```python
+    logger.info(f"saving model to {model_file}")
+    with open(model_file, "wb") as f:
+        pickle.dump(m, f)
+    ```
+    
+    Saves as pickle file for later use.
+  </Step>
+</Steps>
+
+### Full Source Code
+
+```python train.py
+import argparse
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from imblearn.combine import SMOTEENN
+from loguru import logger
+import os
+import pandas as pd
+import pickle
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('--data_file', required=True, type=str, help='a csv file with train data')
+parser.add_argument('--model_file', required=True, type=str, help='where the trained model will be stored')
+parser.add_argument('--overwrite_model', default=False, action='store_true', help='if sets overwrites the model file if it exists')
+
+args = parser.parse_args()
+
+model_file = args.model_file
+data_file = args.data_file
+overwrite = args.overwrite_model
+
+# Check if model file already exists
+if os.path.isfile(model_file):
+    if overwrite:
+        logger.info(f"overwriting existing model file {model_file}")
+    else:
+        logger.info(f"model file {model_file} exists. exitting. use --overwrite_model option")
+        exit(-1)
+
+# Load training data
+logger.info("loading train data")
+z = pd.read_csv(data_file)
+
+# Encode training data
+logger.info("encoding train data")
+gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+smoking_history_dict = {'No Info': 0, 'current': 1, 'ever': 2, 'former': 3, 'never': 4, 'not current': 5}
+z = z.replace({'gender': gender_dict, 'smoking_history': smoking_history_dict})
+
+# Separate features and labels
+Xtr = z.drop('diabetes', axis=1)
+ytr = z[['diabetes']]
+
+# Scale training data
+logger.info("scaling train data")
+scaler = StandardScaler()
+Xtr = scaler.fit_transform(Xtr)
+
+# Apply oversampling and undersampling with SMOTEENN
+smote_enn = SMOTEENN(random_state=42)
+Xtr, ytr = smote_enn.fit_resample(Xtr, ytr)
+
+# Train the model
+logger.info("fitting model")
+m = RandomForestClassifier()
+m.fit(Xtr, ytr)
+
+# Save model to file
+logger.info(f"saving model to {model_file}")
+with open(model_file, "wb") as f:
+    pickle.dump(m, f)
+```
+
+## predict.py - Prediction Script
+
+### Command-Line Arguments
+
+```bash
+python predict.py [OPTIONS]
+```
+
+| Argument | Required | Type | Description |
+|----------|----------|------|-------------|
+| `--input_file` | Yes | str | CSV file with input data (no target column) |
+| `--predictions_file` | Yes | str | CSV file where predictions will be saved |
+| `--model_file` | Yes | str | PKL file with trained model |
+
+### Usage Examples
+
+<CodeGroup>
+```bash Basic Usage
+python predict.py --model_file model.pkl --input_file test.csv --predictions_file predictions.csv
+```
+
+```bash Different Files
+python predict.py \
+  --model_file diabetes_model_v2.pkl \
+  --input_file new_patients.csv \
+  --predictions_file output_2024.csv
+```
+</CodeGroup>
+
+### Prediction Process
+
+<Steps>
+  <Step title="Validate Files">
+    ```python
+    if not os.path.isfile(model_file):
+        logger.error(f"model file {model_file} does not exist")
+        exit(-1)
+    
+    if not os.path.isfile(input_file):
+        logger.error(f"input file {input_file} does not exist")
+        exit(-1)
+    ```
+  </Step>
+  
+  <Step title="Load Input Data">
+    ```python
+    logger.info("loading input data")
+    Xts = pd.read_csv(input_file)
+    ```
+  </Step>
+  
+  <Step title="Encode Features">
+    ```python
+    logger.info("encoding data")
+    gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+    smoking_history_dict = {
+        'No Info': 0, 'current': 1, 'ever': 2, 
+        'former': 3, 'never': 4, 'not current': 5
+    }
+    Xts = Xts.replace({'gender': gender_dict, 'smoking_history': smoking_history_dict})
+    ```
+  </Step>
+  
+  <Step title="Scale Features">
+    ```python
+    logger.info("scaling data")
+    scaler = StandardScaler()
+    Xts = scaler.fit_transform(Xts)
+    ```
+    
+    <Warning>
+      The scaler is **fit on test data** rather than using the training scaler. This is a limitation of this implementation and may affect prediction accuracy.
+    </Warning>
+  </Step>
+  
+  <Step title="Load Model">
+    ```python
+    logger.info("loading model")
+    with open(model_file, 'rb') as f:
+        m = pickle.load(f)
+    ```
+  </Step>
+  
+  <Step title="Generate Predictions">
+    ```python
+    logger.info("making predictions")
+    preds = m.predict(Xts)
+    ```
+  </Step>
+  
+  <Step title="Save Results">
+    ```python
+    logger.info(f"saving predictions to {predictions_file}")
+    pd.DataFrame(preds.reshape(-1,1), columns=['preds']).to_csv(predictions_file, index=False)
+    ```
+    
+    Output format:
+    ```csv
+    preds
+    0
+    1
+    0
+    ```
+  </Step>
+</Steps>
+
+### Full Source Code
+
+```python predict.py
+import argparse
+import numpy as np
+from loguru import logger
+from sklearn.preprocessing import StandardScaler
+import os
+import pandas as pd
+import pickle
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('--input_file', required=True, type=str, help='a csv file with input data (no targets)')
+parser.add_argument('--predictions_file', required=True, type=str, help='a csv file where predictions will be saved to')
+parser.add_argument('--model_file', required=True, type=str, help='a pkl file with a model already stored (see train.py)')
+
+args = parser.parse_args()
+
+model_file = args.model_file
+input_file = args.input_file
+predictions_file = args.predictions_file
+
+# Verify model file exists
+if not os.path.isfile(model_file):
+    logger.error(f"model file {model_file} does not exist")
+    exit(-1)
+
+# Verify input file exists
+if not os.path.isfile(input_file):
+    logger.error(f"input file {input_file} does not exist")
+    exit(-1)
+
+# Load input data
+logger.info("loading input data")
+Xts = pd.read_csv(input_file)
+
+# Encode input data
+logger.info("encoding data")
+gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+smoking_history_dict = {'No Info': 0, 'current': 1, 'ever': 2, 'former': 3, 'never': 4, 'not current': 5}
+Xts = Xts.replace({'gender': gender_dict, 'smoking_history': smoking_history_dict})
+
+# Scale input data
+logger.info("scaling data")
+scaler = StandardScaler()
+Xts = scaler.fit_transform(Xts)
+
+# Load model
+logger.info("loading model")
+with open(model_file, 'rb') as f:
+    m = pickle.load(f)
+
+# Make predictions
+logger.info("making predictions")
+preds = m.predict(Xts)
+
+# Save predictions to file
+logger.info(f"saving predictions to {predictions_file}")
+pd.DataFrame(preds.reshape(-1,1), columns=['preds']).to_csv(predictions_file, index=False)
+```
+
+## Dockerfile
+
+The Docker container is built from this Dockerfile:
+
+```dockerfile Dockerfile
+# Select Python base image
+FROM python:3.12
+
+# Set working directory
+WORKDIR /app
+
+# Copy necessary files to application directory
+ADD train.py /app
+ADD predict.py /app
+ADD requirements.txt /app
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+```
+
+### Dependencies (requirements.txt)
+
+```txt
+argparse
+scikit-learn
+loguru
+pandas
+imbalanced-learn
+```
+
+## Advanced Usage
+
+### Copy Files Out of Container
+
+Retrieve predictions from the container:
+
+```bash
+# Copy predictions to host
+docker cp ai-container:/app/predictions.csv ./local_predictions.csv
+
+# Copy trained model to host
+docker cp ai-container:/app/model.pkl ./saved_model.pkl
+```
+
+### Automated Pipeline
+
+Create a shell script for automated training and prediction:
+
+```bash pipeline.sh
+#!/bin/bash
+
+# Build image
+docker build -t ai-proyecto-sustituto .
+
+# Run container
+docker run -d --name ai-container ai-proyecto-sustituto sleep infinity
+
+# Copy data files
+docker cp train.csv ai-container:/app
+docker cp test.csv ai-container:/app
+
+# Train model
+docker exec ai-container python train.py \
+  --model_file model.pkl \
+  --data_file train.csv \
+  --overwrite_model
+
+# Make predictions
+docker exec ai-container python predict.py \
+  --model_file model.pkl \
+  --input_file test.csv \
+  --predictions_file predictions.csv
+
+# Copy results
+docker cp ai-container:/app/predictions.csv ./results/
+
+# Cleanup
+docker stop ai-container
+docker rm ai-container
+```
+
+Run the pipeline:
+
+```bash
+chmod +x pipeline.sh
+./pipeline.sh
+```
+
+### Volume Mounting
+
+Mount local directories for easier file access:
+
+```bash
+docker run -it \
+  --name ai-container \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/models:/app/models \
+  ai-proyecto-sustituto /bin/bash
+
+# Inside container
+python train.py --model_file models/model.pkl --data_file data/train.csv --overwrite_model
+python predict.py --model_file models/model.pkl --input_file data/test.csv --predictions_file data/predictions.csv
+```
+
+## Troubleshooting
+
+<Accordion title="Model file exists error">
+  **Error**: `model file model.pkl exists. exitting. use --overwrite_model option`
+  
+  **Solution**: Add the `--overwrite_model` flag:
+  ```bash
+  python train.py --model_file model.pkl --data_file train.csv --overwrite_model
+  ```
+  
+  Or delete the existing model:
+  ```bash
+  rm model.pkl
+  ```
+</Accordion>
+
+<Accordion title="File not found errors">
+  **Error**: `model file model.pkl does not exist` or `input file test.csv does not exist`
+  
+  **Solution**: Verify files are in the container:
+  ```bash
+  docker exec ai-container ls -la /app
+  ```
+  
+  Copy missing files:
+  ```bash
+  docker cp train.csv ai-container:/app
+  docker cp test.csv ai-container:/app
+  ```
+</Accordion>
+
+<Accordion title="Container exits immediately">
+  **Problem**: Container stops right after starting
+  
+  **Reason**: The Dockerfile doesn't have a CMD, so the container needs a command
+  
+  **Solution**: Use interactive mode with bash:
+  ```bash
+  docker run -it --name ai-container ai-proyecto-sustituto /bin/bash
+  ```
+  
+  Or run with sleep:
+  ```bash
+  docker run -d --name ai-container ai-proyecto-sustituto sleep infinity
+  docker exec -it ai-container /bin/bash
+  ```
+</Accordion>
+
+<Accordion title="CSV encoding issues">
+  **Problem**: Special characters in CSV cause errors
+  
+  **Solution**: Ensure CSV is UTF-8 encoded:
+  ```python
+  import pandas as pd
+  df = pd.read_csv('data.csv', encoding='utf-8')
+  df.to_csv('data_clean.csv', encoding='utf-8', index=False)
+  ```
+</Accordion>
+
+## Comparison with Other Phases
+
+| Feature | Phase 1 (Notebook) | Phase 2 (CLI) | Phase 3 (API) |
+|---------|-------------------|---------------|---------------|
+| Interface | Jupyter cells | Command-line | REST endpoints |
+| Deployment | Google Colab | Docker container | Docker container |
+| Best For | Exploration | Batch processing | Production/Web |
+| Input | Inline code | CSV files | JSON requests |
+| Output | Inline results | CSV files | JSON responses |
+| Automation | Manual | Scriptable | Fully automated |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Phase 3: API" icon="cloud" href="/getting-started/phase-3-api">
+    Deploy a REST API for real-time predictions
+  </Card>
+  
+  <Card title="Docker Setup" icon="docker" href="/deployment/docker-setup">
+    Advanced Docker configuration and best practices
+  </Card>
+  
+  <Card title="CLI Usage" icon="terminal" href="/deployment/cli-usage">
+    Detailed guide for CLI operations and automation
+  </Card>
+  
+  <Card title="Data Preprocessing" icon="filter" href="/concepts/data-preprocessing">
+    Deep dive into encoding and scaling pipeline
+  </Card>
+</CardGroup>

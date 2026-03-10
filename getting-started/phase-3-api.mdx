@@ -1,0 +1,1062 @@
+---
+title: 'Phase 3: REST API'
+description: 'FastAPI-based REST API for production diabetes predictions'
+---
+
+## Overview
+
+Phase 3 provides a production-ready REST API built with FastAPI for real-time diabetes predictions. This phase is designed for web applications, microservices, and integration with other systems.
+
+<Info>
+  **Best For**: Production deployments, web applications, mobile apps, and any system requiring real-time HTTP-based predictions.
+  
+  **Location**: `~/workspace/source/fase-3/`
+</Info>
+
+## Architecture
+
+The API consists of several key components:
+
+```
+fase-3/
+├── apirest.py      # FastAPI application with endpoints
+├── patient.py      # Pydantic model for request validation
+├── train.py        # Training logic (no CLI)
+├── predict.py      # Prediction logic
+├── Dockerfile      # Container configuration
+└── requirements.txt # Dependencies
+```
+
+<CardGroup cols={2}>
+  <Card title="apirest.py" icon="server">
+    Main FastAPI application exposing `/train` and `/predict` endpoints
+  </Card>
+  
+  <Card title="patient.py" icon="file-medical">
+    Pydantic model defining patient data structure and validation rules
+  </Card>
+  
+  <Card title="train.py" icon="graduation-cap">
+    Training function called by the `/train` endpoint
+  </Card>
+  
+  <Card title="predict.py" icon="wand-magic-sparkles">
+    Prediction function that processes Patient objects
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Navigate to Directory">
+    ```bash
+    cd ~/workspace/source/fase-3
+    ```
+  </Step>
+  
+  <Step title="Build Docker Image">
+    ```bash
+    docker build -t apirest .
+    ```
+    
+    This creates a container with:
+    - Python 3.12
+    - FastAPI 0.111.0
+    - scikit-learn 1.4.1
+    - imbalanced-learn 0.12.0
+    - All required dependencies
+  </Step>
+  
+  <Step title="Run API Container">
+    ```bash
+    docker run -d --name apirest-container -p 80:80 apirest
+    ```
+    
+    Flags explained:
+    - `-d`: Detached mode (runs in background)
+    - `--name apirest-container`: Container name
+    - `-p 80:80`: Map host port 80 to container port 80
+  </Step>
+  
+  <Step title="Copy Training Data">
+    ```bash
+    docker cp train.csv apirest-container:/app
+    ```
+    
+    The API expects `train.csv` in the `/app` directory.
+  </Step>
+  
+  <Step title="Access API Documentation">
+    Open your browser and navigate to:
+    
+    ```
+    http://localhost/docs
+    ```
+    
+    You'll see the interactive Swagger UI.
+  </Step>
+</Steps>
+
+## API Endpoints
+
+### POST /train
+
+Trains a new diabetes prediction model using the `train.csv` file.
+
+<Tabs>
+  <Tab title="Swagger UI">
+    1. Navigate to `http://localhost/docs`
+    2. Click on **`POST /train`**
+    3. Click **"Try it out"**
+    4. Click **"Execute"**
+  </Tab>
+  
+  <Tab title="cURL">
+    ```bash
+    curl -X POST "http://localhost/train" \
+      -H "accept: application/json"
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    
+    response = requests.post("http://localhost/train")
+    print(response.json())
+    # {'message': 'Model successfully trained'}
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    fetch('http://localhost/train', {
+      method: 'POST',
+      headers: {'Accept': 'application/json'}
+    })
+    .then(response => response.json())
+    .then(data => console.log(data));
+    // {message: 'Model successfully trained'}
+    ```
+  </Tab>
+</Tabs>
+
+**Response:**
+
+<CodeGroup>
+```json Success
+{
+  "message": "Model successfully trained"
+}
+```
+
+```json Error
+{
+  "message": "Something went wrong"
+}
+```
+</CodeGroup>
+
+**What it does:**
+
+1. Checks if `train.csv` exists in `/app`
+2. Loads and encodes the data
+3. Applies StandardScaler normalization
+4. Uses SMOTEENN to balance classes
+5. Trains RandomForestClassifier
+6. Saves model to `model.pkl`
+
+### POST /predict
+
+Makes a diabetes prediction for a single patient.
+
+**Request Body:**
+
+```json
+{
+  "gender": "Female",
+  "age": 36,
+  "hypertension": 0,
+  "heart_disease": 0,
+  "smoking_history": "current",
+  "bmi": 32.27,
+  "HbA1c_level": 6.2,
+  "blood_glucose_level": 220
+}
+```
+
+<Tabs>
+  <Tab title="Swagger UI">
+    1. Navigate to `http://localhost/docs`
+    2. Click on **`POST /predict`**
+    3. Click **"Try it out"**
+    4. Modify the request body with patient data
+    5. Click **"Execute"**
+  </Tab>
+  
+  <Tab title="cURL">
+    ```bash
+    curl -X POST "http://localhost/predict" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "gender": "Female",
+        "age": 36,
+        "hypertension": 0,
+        "heart_disease": 0,
+        "smoking_history": "current",
+        "bmi": 32.27,
+        "HbA1c_level": 6.2,
+        "blood_glucose_level": 220
+      }'
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    
+    patient_data = {
+        "gender": "Female",
+        "age": 36,
+        "hypertension": 0,
+        "heart_disease": 0,
+        "smoking_history": "current",
+        "bmi": 32.27,
+        "HbA1c_level": 6.2,
+        "blood_glucose_level": 220
+    }
+    
+    response = requests.post(
+        "http://localhost/predict",
+        json=patient_data
+    )
+    print(response.json())
+    # {'message': 'Tiene diabetes'}
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    const patientData = {
+      gender: "Female",
+      age: 36,
+      hypertension: 0,
+      heart_disease: 0,
+      smoking_history: "current",
+      bmi: 32.27,
+      HbA1c_level: 6.2,
+      blood_glucose_level: 220
+    };
+    
+    fetch('http://localhost/predict', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(patientData)
+    })
+    .then(response => response.json())
+    .then(data => console.log(data));
+    // {message: 'Tiene diabetes'}
+    ```
+  </Tab>
+</Tabs>
+
+**Response:**
+
+<CodeGroup>
+```json Has Diabetes
+{
+  "message": "Tiene diabetes"
+}
+```
+
+```json No Diabetes
+{
+  "message": "No tiene diabetes"
+}
+```
+
+```json Error
+{
+  "message": "Something went wrong"
+}
+```
+</CodeGroup>
+
+## Source Code Deep Dive
+
+### apirest.py - Main Application
+
+```python apirest.py
+from fastapi import FastAPI
+from patient import Patient
+
+import train as tr
+import predict as pr
+
+
+app = FastAPI()
+
+
+@app.post("/train")
+def train():
+    """
+    Exposes an endpoint to train a machine learning model.
+    """
+    return tr.train()
+
+
+@app.post("/predict")
+def predict(patient: Patient):
+    """
+    Exposes an endpoint to make a prediction based on patient information.
+
+    Parameters:
+    - patient: A Patient object containing the patient's input information.
+
+    Returns:
+    - A dictionary with a prediction message.
+    """
+    return pr.predict(patient)
+```
+
+<Info>
+  **FastAPI Features:**
+  - Automatic request validation via Pydantic
+  - Interactive API docs at `/docs`
+  - OpenAPI schema at `/openapi.json`
+  - Type hints for better IDE support
+</Info>
+
+### patient.py - Request Model
+
+```python patient.py
+from pydantic import BaseModel
+
+
+class Patient(BaseModel):
+    """
+    Represents a patient with their respective attributes.
+
+    Attributes:
+    - gender (str): Patient's gender (Female, Male, Other)
+    - age (int): Patient's age
+    - hypertension (int): Hypertension disease (1: yes, 0: no)
+    - heart_disease (int): Heart disease (1: yes, 0: no)
+    - smoking_history (str): Patient's smoking history (not current, former, No Info, current, never, ever.)
+    - bmi (float): Patient's body mass index
+    - HbA1c_level (float): Patient's hemoglobin A1c level
+    - blood_glucose_level (int): Patient's blood sugar level
+    """
+
+    gender: str
+    age: int
+    hypertension: int
+    heart_disease: int
+    smoking_history: str
+    bmi: float
+    HbA1c_level: float
+    blood_glucose_level: int
+```
+
+<Accordion title="Pydantic Validation Benefits">
+  The `Patient` model provides automatic validation:
+  
+  **Type Checking:**
+  ```json
+  # This will fail - age must be int
+  {"age": "thirty-six", ...}
+  ```
+  
+  **Required Fields:**
+  ```json
+  # This will fail - missing bmi
+  {"gender": "Female", "age": 36, ...}
+  ```
+  
+  **Type Coercion:**
+  ```json
+  # This works - "36" converted to 36
+  {"age": "36", ...}
+  ```
+  
+  FastAPI automatically returns detailed error messages for invalid requests.
+</Accordion>
+
+### train.py - Training Logic
+
+```python train.py
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from imblearn.combine import SMOTEENN
+from loguru import logger
+import os
+import pandas as pd
+import pickle
+
+
+model_file = "model.pkl"  # Model file path
+data_file = "train.csv"  # Training data file path
+overwrite = True  # Overwrite existing model
+
+def train():
+    """
+    Trains a machine learning model using data from 'train.csv' 
+    and saves the trained model to 'model.pkl'.
+    """
+
+    try:
+        # Check if model file already exists
+        if os.path.isfile(model_file):
+            if overwrite:
+                logger.info(f"overwriting existing model file {model_file}")
+            else:
+                logger.info(
+                    f"model file {model_file} exists. exitting. use --overwrite_model option"
+                )
+                exit(-1)
+
+        # Load training data
+        logger.info("loading train data")
+        z = pd.read_csv(data_file)
+
+        # Encode training data
+        logger.info("encoding train data")
+        gender_dict = {"Female": 0, "Male": 1, "Other": 2}
+        smoking_history_dict = {
+            "No Info": 0,
+            "current": 1,
+            "ever": 2,
+            "former": 3,
+            "never": 4,
+            "not current": 5,
+        }
+        z = z.replace({"gender": gender_dict, "smoking_history": smoking_history_dict})
+
+        # Separate features (Xtr) and labels (ytr)
+        Xtr = z.drop("diabetes", axis=1)
+        ytr = z[["diabetes"]]
+
+        # Scale training data
+        logger.info("scaling train data")
+        scaler = StandardScaler()
+        Xtr = scaler.fit_transform(Xtr)
+
+        # Apply oversampling and undersampling with SMOTEENN
+        smote_enn = SMOTEENN(random_state=42)
+        Xtr, ytr = smote_enn.fit_resample(Xtr, ytr)
+
+        # Train the model
+        logger.info("fitting model")
+        m = RandomForestClassifier()
+        m.fit(Xtr, ytr)
+
+        # Save model to file
+        logger.info(f"saving model to {model_file}")
+        with open(model_file, "wb") as f:
+            pickle.dump(m, f)
+
+        return {"message": "Model successfully trained"}
+
+    except:
+        return {"message": "Something went wrong"}
+```
+
+<Warning>
+  The `except` clause catches all exceptions without logging details. This makes debugging difficult. Consider improving error handling:
+  
+  ```python
+  except Exception as e:
+      logger.error(f"Training failed: {str(e)}")
+      return {"message": f"Training failed: {str(e)}"}
+  ```
+</Warning>
+
+### predict.py - Prediction Logic
+
+```python predict.py
+from patient import Patient
+from sklearn.preprocessing import StandardScaler
+from imblearn.combine import SMOTEENN
+from loguru import logger
+import os
+import pandas as pd
+import pickle
+
+
+model_file = "model.pkl"  # Model file path
+
+def predict(patient: Patient):
+    """
+    Makes a prediction based on the input patient information.
+
+    Parameters:
+    - patient: A Patient object containing the patient's input information.
+
+    Returns:
+    - A dictionary with a prediction message.
+    """
+
+    try:
+        # Load input data
+        Xts = pd.DataFrame([patient.model_dump()])
+
+        # Verify model file exists
+        if not os.path.isfile(model_file):
+            logger.error(f"model file {model_file} does not exist")
+            exit(-1)
+
+        # Encode input data
+        logger.info("encoding data")
+        gender_dict = {"Female": 0, "Male": 1, "Other": 2}
+        smoking_history_dict = {
+            "No Info": 0,
+            "current": 1,
+            "ever": 2,
+            "former": 3,
+            "never": 4,
+            "not current": 5,
+        }
+        Xts = Xts.replace({"gender": gender_dict, "smoking_history": smoking_history_dict})
+
+        # Scale input data
+        logger.info("scaling data")
+        scaler = StandardScaler()
+        Xts = scaler.fit_transform(Xts)
+
+        # Load model
+        logger.info("loading model")
+        with open(model_file, "rb") as f:
+            m = pickle.load(f)
+
+        # Make predictions
+        logger.info("making predictions")
+        preds = m.predict(Xts)
+
+        return {"message": "Tiene diabetes" if preds[0] == 1 else "No tiene diabetes"}
+    
+    except:
+        return {"message": "Something went wrong"}
+```
+
+<Note>
+  **patient.model_dump()** is Pydantic v2 syntax. In Pydantic v1, use `patient.dict()` instead.
+</Note>
+
+## Dockerfile
+
+```dockerfile Dockerfile
+# Select Python base image
+FROM python:3.12
+
+# Set working directory
+WORKDIR /app
+
+# Copy necessary files to application directory
+ADD .. /app
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Run the application
+CMD ["fastapi", "run", "apirest.py", "--port", "80"]
+```
+
+<Tip>
+  The `ADD .. /app` copies the parent directory. This works but is unconventional. A cleaner approach:
+  
+  ```dockerfile
+  COPY . /app
+  ```
+</Tip>
+
+### Dependencies
+
+```txt requirements.txt
+fastapi==0.111.0 
+scikit-learn==1.4.1.post1
+loguru==0.7.2
+pandas==2.2.1
+imbalanced-learn==0.12.0
+```
+
+## Testing the API
+
+### Sample Patient Profiles
+
+<Tabs>
+  <Tab title="High Risk">
+    ```json
+    {
+      "gender": "Female",
+      "age": 65,
+      "hypertension": 1,
+      "heart_disease": 1,
+      "smoking_history": "current",
+      "bmi": 35.5,
+      "HbA1c_level": 7.2,
+      "blood_glucose_level": 250
+    }
+    ```
+    
+    **Expected**: "Tiene diabetes"
+    
+    **Risk Factors**: Elderly, obese, hypertension, heart disease, diabetic HbA1c, very high glucose
+  </Tab>
+  
+  <Tab title="Low Risk">
+    ```json
+    {
+      "gender": "Male",
+      "age": 25,
+      "hypertension": 0,
+      "heart_disease": 0,
+      "smoking_history": "never",
+      "bmi": 22.0,
+      "HbA1c_level": 4.9,
+      "blood_glucose_level": 85
+    }
+    ```
+    
+    **Expected**: "No tiene diabetes"
+    
+    **Protective Factors**: Young, healthy weight, no diseases, non-smoker, normal glucose
+  </Tab>
+  
+  <Tab title="Moderate Risk">
+    ```json
+    {
+      "gender": "Female",
+      "age": 45,
+      "hypertension": 0,
+      "heart_disease": 0,
+      "smoking_history": "former",
+      "bmi": 28.5,
+      "HbA1c_level": 5.9,
+      "blood_glucose_level": 110
+    }
+    ```
+    
+    **Expected**: Variable
+    
+    **Mixed Factors**: Overweight, prediabetic range, but no major diseases
+  </Tab>
+  
+  <Tab title="Example from README">
+    ```json
+    {
+      "gender": "Female",
+      "age": 36,
+      "hypertension": 0,
+      "heart_disease": 0,
+      "smoking_history": "current",
+      "bmi": 32.27,
+      "HbA1c_level": 6.2,
+      "blood_glucose_level": 220
+    }
+    ```
+    
+    **Expected**: "Tiene diabetes"
+    
+    This is the exact example from the project README.
+  </Tab>
+</Tabs>
+
+### Validation Testing
+
+<Accordion title="Missing Required Field">
+  **Request:**
+  ```json
+  {
+    "gender": "Female",
+    "age": 36
+    // Missing other required fields
+  }
+  ```
+  
+  **Response (422 Unprocessable Entity):**
+  ```json
+  {
+    "detail": [
+      {
+        "loc": ["body", "hypertension"],
+        "msg": "field required",
+        "type": "value_error.missing"
+      },
+      // ... other missing fields
+    ]
+  }
+  ```
+</Accordion>
+
+<Accordion title="Invalid Type">
+  **Request:**
+  ```json
+  {
+    "gender": "Female",
+    "age": "thirty-six",  // Should be int
+    ...
+  }
+  ```
+  
+  **Response (422 Unprocessable Entity):**
+  ```json
+  {
+    "detail": [
+      {
+        "loc": ["body", "age"],
+        "msg": "value is not a valid integer",
+        "type": "type_error.integer"
+      }
+    ]
+  }
+  ```
+</Accordion>
+
+<Accordion title="Invalid Categorical Value">
+  **Request:**
+  ```json
+  {
+    "gender": "NonBinary",  // Not in encoding dict
+    ...
+  }
+  ```
+  
+  **Response:**
+  ```json
+  {
+    "message": "Something went wrong"
+  }
+  ```
+  
+  <Warning>
+    This should be caught by validation, but currently passes Pydantic and fails during encoding. Consider adding enum validation:
+    
+    ```python
+    from enum import Enum
+    
+    class Gender(str, Enum):
+        female = "Female"
+        male = "Male"
+        other = "Other"
+    
+    class Patient(BaseModel):
+        gender: Gender
+        ...
+    ```
+  </Warning>
+</Accordion>
+
+## Advanced Usage
+
+### Custom Port
+
+Run on a different port:
+
+```bash
+# Run on port 8080 instead of 80
+docker run -d --name apirest-container -p 8080:80 apirest
+
+# Access at http://localhost:8080/docs
+```
+
+### Environment Variables
+
+Pass configuration via environment variables:
+
+```bash
+docker run -d \
+  --name apirest-container \
+  -p 80:80 \
+  -e MODEL_FILE=/app/models/diabetes_v2.pkl \
+  -e DATA_FILE=/app/data/train.csv \
+  apirest
+```
+
+Modify `train.py` and `predict.py` to use environment variables:
+
+```python
+import os
+
+model_file = os.getenv("MODEL_FILE", "model.pkl")
+data_file = os.getenv("DATA_FILE", "train.csv")
+```
+
+### Volume Mounting
+
+Persist models and data:
+
+```bash
+mkdir -p ./data ./models
+
+docker run -d \
+  --name apirest-container \
+  -p 80:80 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/models:/app/models \
+  apirest
+
+# Copy training data
+cp train.csv ./data/
+
+# Model will persist in ./models/model.pkl
+```
+
+### Health Check Endpoint
+
+Add a health check to `apirest.py`:
+
+```python
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+@app.get("/model-status")
+def model_status():
+    model_exists = os.path.isfile("model.pkl")
+    return {
+        "model_trained": model_exists,
+        "model_file": "model.pkl"
+    }
+```
+
+### CORS for Web Applications
+
+Enable CORS to allow requests from web browsers:
+
+```python
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify actual origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+## Integration Examples
+
+### Python Client
+
+```python client.py
+import requests
+
+class DiabetesPredictor:
+    def __init__(self, base_url="http://localhost"):
+        self.base_url = base_url
+    
+    def train_model(self):
+        """Train the diabetes prediction model."""
+        response = requests.post(f"{self.base_url}/train")
+        response.raise_for_status()
+        return response.json()
+    
+    def predict(self, patient_data):
+        """Make a prediction for a patient."""
+        response = requests.post(
+            f"{self.base_url}/predict",
+            json=patient_data
+        )
+        response.raise_for_status()
+        return response.json()
+
+# Usage
+predictor = DiabetesPredictor()
+
+# Train model
+result = predictor.train_model()
+print(result)  # {'message': 'Model successfully trained'}
+
+# Make prediction
+patient = {
+    "gender": "Female",
+    "age": 36,
+    "hypertension": 0,
+    "heart_disease": 0,
+    "smoking_history": "current",
+    "bmi": 32.27,
+    "HbA1c_level": 6.2,
+    "blood_glucose_level": 220
+}
+
+prediction = predictor.predict(patient)
+print(prediction)  # {'message': 'Tiene diabetes'}
+```
+
+### React Frontend
+
+```jsx DiabetesForm.jsx
+import { useState } from 'react';
+
+function DiabetesForm() {
+  const [patient, setPatient] = useState({
+    gender: 'Female',
+    age: 36,
+    hypertension: 0,
+    heart_disease: 0,
+    smoking_history: 'never',
+    bmi: 25.0,
+    HbA1c_level: 5.5,
+    blood_glucose_level: 100
+  });
+  
+  const [prediction, setPrediction] = useState(null);
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    const response = await fetch('http://localhost/predict', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(patient)
+    });
+    
+    const result = await response.json();
+    setPrediction(result.message);
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="number"
+        value={patient.age}
+        onChange={(e) => setPatient({...patient, age: parseInt(e.target.value)})}
+      />
+      {/* Other inputs */}
+      <button type="submit">Predict</button>
+      {prediction && <div>Result: {prediction}</div>}
+    </form>
+  );
+}
+```
+
+## Monitoring and Logging
+
+### View Container Logs
+
+```bash
+# Follow logs in real-time
+docker logs -f apirest-container
+
+# View last 100 lines
+docker logs --tail 100 apirest-container
+
+# View logs with timestamps
+docker logs -t apirest-container
+```
+
+### Log Output Format
+
+Thanks to `loguru`, logs are well-formatted:
+
+```
+2024-03-10 10:15:23.456 | INFO     | train:train:32 - loading train data
+2024-03-10 10:15:24.123 | INFO     | train:train:36 - encoding train data
+2024-03-10 10:15:25.789 | INFO     | train:train:52 - scaling train data
+2024-03-10 10:15:28.456 | INFO     | train:train:61 - fitting model
+2024-03-10 10:15:45.123 | INFO     | train:train:66 - saving model to model.pkl
+```
+
+## Troubleshooting
+
+<Accordion title="Port already in use">
+  **Error**: `Bind for 0.0.0.0:80 failed: port is already allocated`
+  
+  **Solution**: Use a different host port:
+  ```bash
+  docker run -d --name apirest-container -p 8080:80 apirest
+  ```
+  
+  Access at `http://localhost:8080/docs`
+</Accordion>
+
+<Accordion title="Model file does not exist">
+  **Error**: Prediction returns "Something went wrong" with log: `model file model.pkl does not exist`
+  
+  **Solution**: Train the model first:
+  1. Ensure `train.csv` is copied to container
+  2. Call `/train` endpoint before `/predict`
+  
+  ```bash
+  docker cp train.csv apirest-container:/app
+  curl -X POST http://localhost/train
+  ```
+</Accordion>
+
+<Accordion title="Cannot access /docs">
+  **Problem**: Browser can't connect to http://localhost/docs
+  
+  **Solutions**:
+  
+  1. Check container is running:
+  ```bash
+  docker ps | grep apirest
+  ```
+  
+  2. Check port mapping:
+  ```bash
+  docker port apirest-container
+  # Should show: 80/tcp -> 0.0.0.0:80
+  ```
+  
+  3. Try with explicit IP:
+  ```
+  http://127.0.0.1/docs
+  ```
+  
+  4. Check for firewall blocking port 80
+</Accordion>
+
+<Accordion title="422 Validation Error">
+  **Error**: Unprocessable Entity with validation details
+  
+  **Reason**: Request body doesn't match Patient schema
+  
+  **Solution**: Ensure all required fields are present with correct types:
+  - `gender`: string ("Female", "Male", "Other")
+  - `age`: integer
+  - `hypertension`: integer (0 or 1)
+  - `heart_disease`: integer (0 or 1)
+  - `smoking_history`: string ("never", "current", "former", "ever", "not current", "No Info")
+  - `bmi`: float
+  - `HbA1c_level`: float
+  - `blood_glucose_level`: integer
+</Accordion>
+
+## Comparison with Other Phases
+
+| Feature | Phase 1 | Phase 2 | Phase 3 |
+|---------|---------|---------|----------|
+| **Interface** | Jupyter | CLI | REST API |
+| **Input Format** | Code cells | CSV files | JSON requests |
+| **Output Format** | Inline | CSV files | JSON responses |
+| **Scalability** | Low | Medium | High |
+| **Web Integration** | None | None | Native |
+| **Real-time** | Manual | Batch | Yes |
+| **Automatic Docs** | No | No | Yes (Swagger) |
+| **Validation** | Manual | Manual | Automatic |
+| **Production Ready** | No | Partial | Yes |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Deployment" icon="cloud" href="/deployment/api-deployment">
+    Advanced deployment strategies and production considerations
+  </Card>
+  
+  <Card title="Docker Setup" icon="docker" href="/deployment/docker-setup">
+    Docker best practices and advanced configurations
+  </Card>
+  
+  <Card title="Patient Features" icon="stethoscope" href="/concepts/patient-features">
+    Detailed guide to interpreting patient features
+  </Card>
+  
+  <Card title="Model Architecture" icon="sitemap" href="/concepts/model-architecture">
+    Understanding the RandomForest model and pipeline
+  </Card>
+</CardGroup>

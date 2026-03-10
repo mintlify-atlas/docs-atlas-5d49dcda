@@ -1,0 +1,808 @@
+---
+title: 'API Deployment'
+description: 'Production deployment strategies for the FastAPI-based diabetes prediction service'
+---
+
+## Overview
+
+Phase 3 provides a FastAPI-based REST API for real-time diabetes predictions. This guide covers deployment strategies, production considerations, and integration patterns.
+
+<Info>
+  **Framework**: FastAPI 0.111.0
+  
+  **Deployment**: Docker containerized
+  
+  **Best For**: Web apps, mobile apps, microservices, real-time predictions
+</Info>
+
+## API Architecture
+
+```
+fase-3/
+├── apirest.py        # Main FastAPI application
+├── patient.py        # Pydantic Patient model
+├── train.py          # Training logic
+├── predict.py        # Prediction logic
+├── Dockerfile        # Container configuration
+└── requirements.txt  # Python dependencies
+```
+
+### Endpoints
+
+<CardGroup cols={2}>
+  <Card title="POST /train" icon="graduation-cap">
+    Trains a new model from train.csv
+    
+    **Input**: None (reads train.csv)
+    
+    **Output**: JSON status message
+  </Card>
+  
+  <Card title="POST /predict" icon="stethoscope">
+    Predicts diabetes for a single patient
+    
+    **Input**: Patient JSON
+    
+    **Output**: Prediction message
+  </Card>
+</CardGroup>
+
+## Quick Deployment
+
+<Steps>
+  <Step title="Build Image">
+    ```bash
+    cd ~/workspace/source/fase-3
+    docker build -t diabetes-api .
+    ```
+  </Step>
+  
+  <Step title="Start API Server">
+    ```bash
+    docker run -d \
+      --name diabetes-api \
+      -p 80:80 \
+      diabetes-api
+    ```
+    
+    API is now accessible at `http://localhost`
+  </Step>
+  
+  <Step title="Copy Training Data">
+    ```bash
+    docker cp train.csv diabetes-api:/app
+    ```
+  </Step>
+  
+  <Step title="Train Model via API">
+    ```bash
+    curl -X POST http://localhost/train
+    ```
+    
+    **Response:**
+    ```json
+    {"message": "Model successfully trained"}
+    ```
+  </Step>
+  
+  <Step title="Test Prediction">
+    ```bash
+    curl -X POST http://localhost/predict \
+      -H "Content-Type: application/json" \
+      -d '{
+        "gender": "Female",
+        "age": 36,
+        "hypertension": 0,
+        "heart_disease": 0,
+        "smoking_history": "current",
+        "bmi": 32.27,
+        "HbA1c_level": 6.2,
+        "blood_glucose_level": 220
+      }'
+    ```
+    
+    **Response:**
+    ```json
+    {"message": "Tiene diabetes"}
+    ```
+  </Step>
+</Steps>
+
+## Production Deployment
+
+### Environment Configuration
+
+Use environment variables for configuration:
+
+```bash
+docker run -d \
+  --name diabetes-api \
+  -p 80:80 \
+  -e MODEL_FILE=/app/models/model.pkl \
+  -e DATA_FILE=/app/data/train.csv \
+  -e LOG_LEVEL=INFO \
+  diabetes-api
+```
+
+**Update Python code to use env vars:**
+
+```python
+import os
+
+# train.py
+model_file = os.getenv("MODEL_FILE", "model.pkl")
+data_file = os.getenv("DATA_FILE", "train.csv")
+
+# predict.py
+model_file = os.getenv("MODEL_FILE", "model.pkl")
+```
+
+### Persistent Storage
+
+Use volumes to persist models and data:
+
+```bash
+mkdir -p ./data ./models
+
+docker run -d \
+  --name diabetes-api \
+  -p 80:80 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/models:/app/models \
+  -e MODEL_FILE=/app/models/model.pkl \
+  -e DATA_FILE=/app/data/train.csv \
+  diabetes-api
+```
+
+**Benefits:**
+- Models persist across container restarts
+- Easy model updates without rebuilding image
+- Backup models from host filesystem
+
+### Reverse Proxy with Nginx
+
+For production, use Nginx as reverse proxy:
+
+**docker-compose.yml:**
+
+```yaml
+version: '3.8'
+
+services:
+  api:
+    build: ./fase-3
+    container_name: diabetes-api
+    expose:
+      - "80"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - MODEL_FILE=/app/models/model.pkl
+      - DATA_FILE=/app/data/train.csv
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: diabetes-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+```
+
+**nginx.conf:**
+
+```nginx
+http {
+    upstream diabetes_api {
+        server api:80;
+    }
+
+    server {
+        listen 80;
+        server_name your-domain.com;
+
+        location / {
+            proxy_pass http://diabetes_api;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+
+    # HTTPS configuration
+    server {
+        listen 443 ssl;
+        server_name your-domain.com;
+
+        ssl_certificate /etc/nginx/ssl/cert.pem;
+        ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+        location / {
+            proxy_pass http://diabetes_api;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
+```
+
+### Health Checks
+
+Add health check endpoint to apirest.py:
+
+```python
+from fastapi import FastAPI
+import os
+
+app = FastAPI()
+
+@app.get("/health")
+def health_check():
+    model_exists = os.path.isfile("model.pkl")
+    return {
+        "status": "healthy" if model_exists else "degraded",
+        "model_loaded": model_exists
+    }
+
+@app.get("/ready")
+def readiness_check():
+    # Check if model is trained and ready
+    if os.path.isfile("model.pkl"):
+        return {"ready": True}
+    return {"ready": False}, 503
+```
+
+**Configure Docker health check:**
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:80/health || exit 1
+```
+
+### Monitoring and Logging
+
+**Structured Logging:**
+
+```python
+from loguru import logger
+import sys
+
+# Configure logger
+logger.remove()  # Remove default handler
+logger.add(
+    sys.stdout,
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}",
+    level="INFO"
+)
+logger.add(
+    "/app/logs/api.log",
+    rotation="100 MB",
+    retention="30 days",
+    level="INFO"
+)
+
+# Use in endpoints
+@app.post("/predict")
+def predict(patient: Patient):
+    logger.info(f"Prediction request: {patient.dict()}")
+    result = pr.predict(patient)
+    logger.info(f"Prediction result: {result}")
+    return result
+```
+
+**Prometheus Metrics:**
+
+```python
+from prometheus_client import Counter, Histogram, make_asgi_app
+import time
+
+# Metrics
+prediction_counter = Counter(
+    'predictions_total',
+    'Total number of predictions',
+    ['outcome']
+)
+
+prediction_duration = Histogram(
+    'prediction_duration_seconds',
+    'Time spent processing prediction'
+)
+
+@app.post("/predict")
+def predict(patient: Patient):
+    start_time = time.time()
+    result = pr.predict(patient)
+    
+    # Record metrics
+    outcome = "diabetes" if "Tiene diabetes" in result["message"] else "no_diabetes"
+    prediction_counter.labels(outcome=outcome).inc()
+    prediction_duration.observe(time.time() - start_time)
+    
+    return result
+
+# Mount Prometheus metrics endpoint
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+```
+
+## Cloud Deployment
+
+### AWS ECS (Elastic Container Service)
+
+<Steps>
+  <Step title="Push to ECR">
+    ```bash
+    # Authenticate
+    aws ecr get-login-password --region us-east-1 | \
+      docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
+    
+    # Tag image
+    docker tag diabetes-api:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/diabetes-api:latest
+    
+    # Push
+    docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/diabetes-api:latest
+    ```
+  </Step>
+  
+  <Step title="Create ECS Task Definition">
+    ```json
+    {
+      "family": "diabetes-api",
+      "containerDefinitions": [
+        {
+          "name": "diabetes-api",
+          "image": "<account-id>.dkr.ecr.us-east-1.amazonaws.com/diabetes-api:latest",
+          "portMappings": [
+            {
+              "containerPort": 80,
+              "protocol": "tcp"
+            }
+          ],
+          "environment": [
+            {"name": "MODEL_FILE", "value": "/app/models/model.pkl"},
+            {"name": "DATA_FILE", "value": "/app/data/train.csv"}
+          ],
+          "mountPoints": [
+            {
+              "sourceVolume": "efs-storage",
+              "containerPath": "/app/models"
+            }
+          ]
+        }
+      ],
+      "volumes": [
+        {
+          "name": "efs-storage",
+          "efsVolumeConfiguration": {
+            "fileSystemId": "fs-12345678"
+          }
+        }
+      ]
+    }
+    ```
+  </Step>
+  
+  <Step title="Create ECS Service">
+    ```bash
+    aws ecs create-service \
+      --cluster diabetes-cluster \
+      --service-name diabetes-api-service \
+      --task-definition diabetes-api \
+      --desired-count 2 \
+      --launch-type FARGATE \
+      --network-configuration "awsvpcConfiguration={subnets=[subnet-12345],securityGroups=[sg-12345],assignPublicIp=ENABLED}"
+    ```
+  </Step>
+</Steps>
+
+### Google Cloud Run
+
+<Steps>
+  <Step title="Build and Push">
+    ```bash
+    # Configure gcloud
+    gcloud auth configure-docker
+    
+    # Tag and push
+    docker tag diabetes-api gcr.io/your-project/diabetes-api
+    docker push gcr.io/your-project/diabetes-api
+    ```
+  </Step>
+  
+  <Step title="Deploy to Cloud Run">
+    ```bash
+    gcloud run deploy diabetes-api \
+      --image gcr.io/your-project/diabetes-api \
+      --platform managed \
+      --region us-central1 \
+      --allow-unauthenticated \
+      --port 80 \
+      --memory 2Gi \
+      --cpu 2
+    ```
+  </Step>
+</Steps>
+
+### Azure Container Instances
+
+```bash
+# Login to Azure
+az login
+
+# Create resource group
+az group create --name diabetes-rg --location eastus
+
+# Deploy container
+az container create \
+  --resource-group diabetes-rg \
+  --name diabetes-api \
+  --image your-registry.azurecr.io/diabetes-api:latest \
+  --dns-name-label diabetes-api-unique \
+  --ports 80
+```
+
+## API Security
+
+### API Key Authentication
+
+```python
+from fastapi import Security, HTTPException, status
+from fastapi.security import APIKeyHeader
+import os
+
+api_key_header = APIKeyHeader(name="X-API-Key")
+
+def verify_api_key(api_key: str = Security(api_key_header)):
+    if api_key != os.getenv("API_KEY"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API Key"
+        )
+    return api_key
+
+@app.post("/predict", dependencies=[Security(verify_api_key)])
+def predict(patient: Patient):
+    return pr.predict(patient)
+```
+
+### Rate Limiting
+
+```python
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.post("/predict")
+@limiter.limit("10/minute")
+def predict(request: Request, patient: Patient):
+    return pr.predict(patient)
+```
+
+### CORS Configuration
+
+```python
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://your-frontend.com",
+        "https://app.your-domain.com"
+    ],
+    allow_credentials=True,
+    allow_methods=["POST", "GET"],
+    allow_headers=["*"],
+)
+```
+
+## Load Testing
+
+Test API performance with locust:
+
+```python
+# locustfile.py
+from locust import HttpUser, task, between
+
+class DiabetesAPIUser(HttpUser):
+    wait_time = between(1, 3)
+    
+    @task
+    def predict_diabetes(self):
+        self.client.post("/predict", json={
+            "gender": "Female",
+            "age": 36,
+            "hypertension": 0,
+            "heart_disease": 0,
+            "smoking_history": "current",
+            "bmi": 32.27,
+            "HbA1c_level": 6.2,
+            "blood_glucose_level": 220
+        })
+```
+
+**Run load test:**
+
+```bash
+locust -f locustfile.py --host http://localhost
+```
+
+## Integration Examples
+
+### React Frontend
+
+```jsx
+import { useState } from 'react';
+
+function DiabetesPrediction() {
+  const [patient, setPatient] = useState({
+    gender: 'Female',
+    age: 36,
+    hypertension: 0,
+    heart_disease: 0,
+    smoking_history: 'never',
+    bmi: 25.0,
+    HbA1c_level: 5.5,
+    blood_glucose_level: 100
+  });
+  const [result, setResult] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    const response = await fetch('http://localhost/predict', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': 'your-api-key'
+      },
+      body: JSON.stringify(patient)
+    });
+    
+    const data = await response.json();
+    setResult(data.message);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* Form inputs */}
+      <button type="submit">Predict</button>
+      {result && <div className="result">{result}</div>}
+    </form>
+  );
+}
+```
+
+### Python Client
+
+```python
+import requests
+
+class DiabetesAPIClient:
+    def __init__(self, base_url, api_key=None):
+        self.base_url = base_url
+        self.headers = {}
+        if api_key:
+            self.headers['X-API-Key'] = api_key
+    
+    def train_model(self):
+        response = requests.post(
+            f"{self.base_url}/train",
+            headers=self.headers
+        )
+        response.raise_for_status()
+        return response.json()
+    
+    def predict(self, patient_data):
+        response = requests.post(
+            f"{self.base_url}/predict",
+            json=patient_data,
+            headers=self.headers
+        )
+        response.raise_for_status()
+        return response.json()
+
+# Usage
+client = DiabetesAPIClient("http://localhost", api_key="your-key")
+
+patient = {
+    "gender": "Female",
+    "age": 36,
+    "hypertension": 0,
+    "heart_disease": 0,
+    "smoking_history": "current",
+    "bmi": 32.27,
+    "HbA1c_level": 6.2,
+    "blood_glucose_level": 220
+}
+
+result = client.predict(patient)
+print(result)  # {"message": "Tiene diabetes"}
+```
+
+### Mobile App (Flutter)
+
+```dart
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+class DiabetesAPI {
+  final String baseUrl;
+  final String? apiKey;
+
+  DiabetesAPI(this.baseUrl, {this.apiKey});
+
+  Future<Map<String, dynamic>> predict(Map<String, dynamic> patient) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/predict'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (apiKey != null) 'X-API-Key': apiKey!,
+      },
+      body: jsonEncode(patient),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to get prediction');
+    }
+  }
+}
+
+// Usage
+final api = DiabetesAPI('http://your-server.com');
+final result = await api.predict({
+  'gender': 'Female',
+  'age': 36,
+  'hypertension': 0,
+  'heart_disease': 0,
+  'smoking_history': 'current',
+  'bmi': 32.27,
+  'HbA1c_level': 6.2,
+  'blood_glucose_level': 220,
+});
+
+print(result['message']);  // "Tiene diabetes"
+```
+
+## Troubleshooting
+
+<Accordion title="502 Bad Gateway">
+  **Cause**: API container not running or unhealthy
+  
+  **Solutions:**
+  
+  ```bash
+  # Check container status
+  docker ps | grep diabetes-api
+  
+  # Check logs
+  docker logs diabetes-api
+  
+  # Restart container
+  docker restart diabetes-api
+  ```
+</Accordion>
+
+<Accordion title="Slow predictions">
+  **Causes**: Large model, CPU constraints, or cold start
+  
+  **Solutions:**
+  
+  1. Allocate more resources:
+  ```bash
+  docker run -d --cpus="2" --memory="4g" ...
+  ```
+  
+  2. Keep model in memory (already done)
+  
+  3. Use model caching:
+  ```python
+  from functools import lru_cache
+  
+  @lru_cache(maxsize=1)
+  def load_model():
+      with open("model.pkl", "rb") as f:
+          return pickle.load(f)
+  ```
+</Accordion>
+
+<Accordion title="CORS errors in browser">
+  **Error**: `Access-Control-Allow-Origin` error
+  
+  **Solution**: Add CORS middleware (see Security section above)
+</Accordion>
+
+## Best Practices
+
+<Steps>
+  <Step title="Version Your API">
+    ```python
+    @app.post("/v1/predict")
+    def predict_v1(patient: Patient):
+        return pr.predict(patient)
+    
+    @app.post("/v2/predict")
+    def predict_v2(patient: PatientV2):
+        # New version with additional features
+        pass
+    ```
+  </Step>
+  
+  <Step title="Document with OpenAPI">
+    FastAPI auto-generates docs at `/docs`
+    
+    Customize:
+    ```python
+    app = FastAPI(
+        title="Diabetes Prediction API",
+        description="ML-powered diabetes risk assessment",
+        version="1.0.0"
+    )
+    ```
+  </Step>
+  
+  <Step title="Validate Input Thoroughly">
+    ```python
+    from pydantic import BaseModel, Field, validator
+    
+    class Patient(BaseModel):
+        age: int = Field(..., ge=0, le=120)
+        bmi: float = Field(..., ge=10, le=100)
+        
+        @validator('gender')
+        def validate_gender(cls, v):
+            if v not in ['Female', 'Male', 'Other']:
+                raise ValueError('Invalid gender')
+            return v
+    ```
+  </Step>
+  
+  <Step title="Implement Graceful Shutdown">
+    ```python
+    import signal
+    import sys
+    
+    def signal_handler(sig, frame):
+        logger.info("Shutting down gracefully...")
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Phase 3 Guide" icon="book" href="/getting-started/phase-3-api">
+    Complete Phase 3 walkthrough
+  </Card>
+  
+  <Card title="Docker Setup" icon="docker" href="/deployment/docker-setup">
+    Docker configuration and best practices
+  </Card>
+  
+  <Card title="CLI Usage" icon="terminal" href="/deployment/cli-usage">
+    For batch processing, explore CLI tools
+  </Card>
+  
+  <Card title="Model Architecture" icon="sitemap" href="/concepts/model-architecture">
+    Understand the underlying model
+  </Card>
+</CardGroup>

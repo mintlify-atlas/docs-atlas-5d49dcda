@@ -1,0 +1,715 @@
+---
+title: 'CLI Usage'
+description: 'Complete guide to using command-line tools for training and predictions'
+---
+
+## Overview
+
+Phase 2 provides command-line interface (CLI) tools for diabetes prediction. This approach is ideal for batch processing, automated pipelines, and integration with existing data workflows.
+
+<Info>
+  **CLI Tools**: `train.py` and `predict.py`
+  
+  **Deployment**: Docker containerized
+  
+  **Best For**: Batch predictions, automated workflows, data pipelines
+</Info>
+
+## CLI Architecture
+
+The CLI system consists of two independent scripts:
+
+```
+fase-2/
+├── train.py          # Model training script
+├── predict.py        # Batch prediction script
+├── requirements.txt  # Python dependencies
+└── Dockerfile        # Container configuration
+```
+
+<CardGroup cols={2}>
+  <Card title="train.py" icon="graduation-cap">
+    Trains RandomForestClassifier from CSV data
+    
+    **Input**: train.csv
+    
+    **Output**: model.pkl
+  </Card>
+  
+  <Card title="predict.py" icon="wand-magic-sparkles">
+    Generates predictions for new patients
+    
+    **Input**: test.csv, model.pkl
+    
+    **Output**: predictions.csv
+  </Card>
+</CardGroup>
+
+## Setup
+
+<Steps>
+  <Step title="Build Docker Image">
+    ```bash
+    cd ~/workspace/source/fase-2
+    docker build -t ai-proyecto-sustituto .
+    ```
+    
+    **What happens:**
+    - Downloads Python 3.12 base image
+    - Copies train.py and predict.py
+    - Installs scikit-learn, pandas, imbalanced-learn, loguru
+    
+    **Time**: 5-10 minutes (first build)
+  </Step>
+  
+  <Step title="Start Container">
+    ```bash
+    docker run -it --name ai-container ai-proyecto-sustituto /bin/bash
+    ```
+    
+    You'll see a prompt like:
+    ```bash
+    root@abc123def456:/app#
+    ```
+  </Step>
+  
+  <Step title="Copy Data Files">
+    In a **new terminal** (keep container running), copy CSV files:
+    
+    ```bash
+    docker cp train.csv ai-container:/app
+    docker cp test.csv ai-container:/app
+    ```
+  </Step>
+</Steps>
+
+## train.py - Training Script
+
+### Command Syntax
+
+```bash
+python train.py --model_file <MODEL> --data_file <DATA> [--overwrite_model]
+```
+
+### Arguments
+
+| Argument | Required | Type | Description |
+|----------|----------|------|-------------|
+| `--model_file` | Yes | string | Path to save trained model (e.g., `model.pkl`) |
+| `--data_file` | Yes | string | Path to training CSV file (e.g., `train.csv`) |
+| `--overwrite_model` | No | flag | Allow overwriting existing model file |
+
+### Basic Usage
+
+<Tabs>
+  <Tab title="First Training">
+    ```bash
+    python train.py --model_file model.pkl --data_file train.csv
+    ```
+    
+    **Output:**
+    ```
+    loading train data
+    encoding train data
+    scaling train data
+    fitting model
+    saving model to model.pkl
+    ```
+    
+    **Result**: Creates `model.pkl` file
+  </Tab>
+  
+  <Tab title="Overwrite Existing Model">
+    ```bash
+    python train.py --model_file model.pkl --data_file train.csv --overwrite_model
+    ```
+    
+    **Output:**
+    ```
+    overwriting existing model file model.pkl
+    loading train data
+    encoding train data
+    scaling train data
+    fitting model
+    saving model to model.pkl
+    ```
+    
+    **Use Case**: Retraining with updated data
+  </Tab>
+  
+  <Tab title="Without Overwrite Flag">
+    ```bash
+    # If model.pkl already exists
+    python train.py --model_file model.pkl --data_file train.csv
+    ```
+    
+    **Output:**
+    ```
+    model file model.pkl exists. exitting. use --overwrite_model option
+    ```
+    
+    **Exit Code**: -1 (error)
+    
+    **Safety**: Prevents accidental overwriting
+  </Tab>
+  
+  <Tab title="Custom Model Name">
+    ```bash
+    python train.py --model_file diabetes_v2.pkl --data_file train.csv
+    ```
+    
+    **Use Case**: Version control for models
+  </Tab>
+</Tabs>
+
+### Training Process Details
+
+What happens during training:
+
+<Steps>
+  <Step title="Load Data">
+    ```python
+    z = pd.read_csv("train.csv")
+    # Expected columns: gender, age, hypertension, heart_disease,
+    #                   smoking_history, bmi, HbA1c_level,
+    #                   blood_glucose_level, diabetes
+    ```
+  </Step>
+  
+  <Step title="Encode Categorical Features">
+    ```python
+    # Gender: Female->0, Male->1, Other->2
+    # Smoking: No Info->0, current->1, ever->2, former->3, never->4, not current->5
+    ```
+  </Step>
+  
+  <Step title="Separate X and y">
+    ```python
+    Xtr = z.drop('diabetes', axis=1)  # 8 features
+    ytr = z[['diabetes']]              # Target
+    ```
+  </Step>
+  
+  <Step title="Scale Features">
+    ```python
+    scaler = StandardScaler()
+    Xtr = scaler.fit_transform(Xtr)
+    # All features normalized to mean=0, std=1
+    ```
+  </Step>
+  
+  <Step title="Balance Classes">
+    ```python
+    smote_enn = SMOTEENN(random_state=42)
+    Xtr, ytr = smote_enn.fit_resample(Xtr, ytr)
+    # Creates ~1:1 ratio of diabetic:non-diabetic
+    ```
+  </Step>
+  
+  <Step title="Train Model">
+    ```python
+    m = RandomForestClassifier()
+    m.fit(Xtr, ytr)
+    # Trains 100 decision trees
+    ```
+  </Step>
+  
+  <Step title="Save Model">
+    ```python
+    with open("model.pkl", "wb") as f:
+        pickle.dump(m, f)
+    # Serializes model to disk
+    ```
+  </Step>
+</Steps>
+
+### Training Data Format
+
+**Expected CSV Structure:**
+
+```csv
+gender,age,hypertension,heart_disease,smoking_history,bmi,HbA1c_level,blood_glucose_level,diabetes
+Female,80.0,0,1,never,25.19,6.6,140,0
+Male,54.0,0,0,No Info,27.32,6.6,80,0
+Female,36.0,0,0,current,23.45,5.0,155,0
+Male,76.0,1,1,current,20.14,4.8,155,0
+```
+
+**Requirements:**
+- Header row required
+- All 9 columns must be present
+- `diabetes` column must contain 0 or 1
+- Categorical values must match encoding dictionaries
+
+### Training Time Estimates
+
+| Dataset Size | Approximate Time |
+|--------------|------------------|
+| 1,000 rows | 1-2 seconds |
+| 10,000 rows | 5-10 seconds |
+| 100,000 rows | 30-60 seconds |
+| 1,000,000 rows | 5-10 minutes |
+
+<Note>
+  Times vary based on CPU and whether SMOTEENN needs to generate many synthetic samples.
+</Note>
+
+### Troubleshooting Training
+
+<Accordion title="File not found error">
+  **Error**: `FileNotFoundError: [Errno 2] No such file or directory: 'train.csv'`
+  
+  **Solution**: Ensure train.csv is in the container:
+  
+  ```bash
+  # Check if file exists
+  ls -la /app/train.csv
+  
+  # If not, copy it
+  docker cp train.csv ai-container:/app
+  ```
+</Accordion>
+
+<Accordion title="Column missing error">
+  **Error**: `KeyError: 'diabetes'`
+  
+  **Solution**: CSV must have all required columns including `diabetes` target
+  
+  ```bash
+  # Check CSV structure
+  head -n 1 train.csv
+  ```
+</Accordion>
+
+<Accordion title="Memory error">
+  **Error**: `MemoryError` during SMOTEENN
+  
+  **Solution**: Allocate more memory to Docker:
+  
+  ```bash
+  docker run -it --memory="4g" --name ai-container ai-proyecto-sustituto /bin/bash
+  ```
+</Accordion>
+
+## predict.py - Prediction Script
+
+### Command Syntax
+
+```bash
+python predict.py --model_file <MODEL> --input_file <INPUT> --predictions_file <OUTPUT>
+```
+
+### Arguments
+
+| Argument | Required | Type | Description |
+|----------|----------|------|-------------|
+| `--model_file` | Yes | string | Path to trained model file (e.g., `model.pkl`) |
+| `--input_file` | Yes | string | Path to input CSV with patient data |
+| `--predictions_file` | Yes | string | Path to save predictions CSV |
+
+### Basic Usage
+
+<Tabs>
+  <Tab title="Simple Prediction">
+    ```bash
+    python predict.py \
+      --model_file model.pkl \
+      --input_file test.csv \
+      --predictions_file predictions.csv
+    ```
+    
+    **Output:**
+    ```
+    loading input data
+    encoding data
+    scaling data
+    loading model
+    making predictions
+    saving predictions to predictions.csv
+    ```
+    
+    **Result**: Creates `predictions.csv`
+  </Tab>
+  
+  <Tab title="View Predictions">
+    ```bash
+    cat predictions.csv
+    ```
+    
+    **Output:**
+    ```csv
+    preds
+    0
+    1
+    0
+    0
+    1
+    0
+    ```
+    
+    **Interpretation:**
+    - `0` = No diabetes
+    - `1` = Has diabetes
+  </Tab>
+  
+  <Tab title="Count Predictions">
+    ```bash
+    # Count diabetes predictions
+    grep -c "^1$" predictions.csv
+    
+    # Or using Python in container
+    python -c "import pandas as pd; df = pd.read_csv('predictions.csv'); print(df['preds'].value_counts())"
+    ```
+    
+    **Output:**
+    ```
+    0    8542
+    1    1458
+    Name: preds, dtype: int64
+    ```
+  </Tab>
+</Tabs>
+
+### Input Data Format
+
+**Expected CSV Structure** (WITHOUT diabetes column):
+
+```csv
+gender,age,hypertension,heart_disease,smoking_history,bmi,HbA1c_level,blood_glucose_level
+Female,36,0,0,current,32.27,6.2,220
+Male,28,0,0,never,27.32,5.7,158
+Female,54,0,0,No Info,27.32,6.6,80
+```
+
+<Warning>
+  **Important**: Input CSV should NOT include the `diabetes` column. Only the 8 feature columns.
+</Warning>
+
+### Output Format
+
+**predictions.csv:**
+
+```csv
+preds
+1
+0
+0
+```
+
+- Single column named `preds`
+- One row per input patient
+- Values: 0 (no diabetes) or 1 (has diabetes)
+- Row order matches input file
+
+### Prediction Process
+
+<Steps>
+  <Step title="Validate Files">
+    ```python
+    # Check model exists
+    if not os.path.isfile(model_file):
+        logger.error(f"model file {model_file} does not exist")
+        exit(-1)
+    
+    # Check input exists
+    if not os.path.isfile(input_file):
+        logger.error(f"input file {input_file} does not exist")
+        exit(-1)
+    ```
+  </Step>
+  
+  <Step title="Load Input Data">
+    ```python
+    Xts = pd.read_csv(input_file)
+    # Expected: 8 feature columns, no diabetes column
+    ```
+  </Step>
+  
+  <Step title="Encode Categorical Features">
+    ```python
+    # Apply same encoding as training
+    gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+    smoking_history_dict = {...}
+    Xts = Xts.replace({'gender': gender_dict, 'smoking_history': smoking_history_dict})
+    ```
+  </Step>
+  
+  <Step title="Scale Features">
+    ```python
+    scaler = StandardScaler()
+    Xts = scaler.fit_transform(Xts)
+    ```
+    
+    <Warning>
+      **Issue**: Creates NEW scaler instead of using training scaler. This may reduce accuracy.
+    </Warning>
+  </Step>
+  
+  <Step title="Load Model">
+    ```python
+    with open(model_file, 'rb') as f:
+        m = pickle.load(f)
+    ```
+  </Step>
+  
+  <Step title="Generate Predictions">
+    ```python
+    preds = m.predict(Xts)
+    # Array of 0s and 1s
+    ```
+  </Step>
+  
+  <Step title="Save Results">
+    ```python
+    pd.DataFrame(preds.reshape(-1,1), columns=['preds']).to_csv(predictions_file, index=False)
+    ```
+  </Step>
+</Steps>
+
+### Troubleshooting Predictions
+
+<Accordion title="Model file does not exist">
+  **Error**: `model file model.pkl does not exist`
+  
+  **Solution**: Train the model first:
+  
+  ```bash
+  python train.py --model_file model.pkl --data_file train.csv
+  ```
+</Accordion>
+
+<Accordion title="Shape mismatch error">
+  **Error**: `ValueError: X has 7 features, but RandomForestClassifier is expecting 8 features`
+  
+  **Solution**: Ensure test.csv has all 8 feature columns (excluding diabetes)
+  
+  ```bash
+  # Check column count
+  head -n 1 test.csv | awk -F',' '{print NF}'
+  # Should output: 8
+  ```
+</Accordion>
+
+<Accordion title="Unknown category error">
+  **Error**: Category not in encoding dictionary
+  
+  **Solution**: Ensure categorical values match training:
+  
+  - **gender**: Female, Male, or Other
+  - **smoking_history**: No Info, current, ever, former, never, not current
+</Accordion>
+
+## Advanced CLI Usage
+
+### Batch Processing Pipeline
+
+Create a shell script for automated workflow:
+
+```bash
+#!/bin/bash
+# diabetes_pipeline.sh
+
+set -e  # Exit on error
+
+# Configuration
+CONTAINER_NAME="ai-container"
+IMAGE_NAME="ai-proyecto-sustituto"
+DATA_DIR="./data"
+MODELS_DIR="./models"
+RESULTS_DIR="./results"
+
+# Create directories
+mkdir -p $DATA_DIR $MODELS_DIR $RESULTS_DIR
+
+echo "[1/6] Building Docker image..."
+docker build -t $IMAGE_NAME .
+
+echo "[2/6] Starting container..."
+docker run -d --name $CONTAINER_NAME $IMAGE_NAME sleep infinity
+
+echo "[3/6] Copying data files..."
+docker cp $DATA_DIR/train.csv $CONTAINER_NAME:/app/
+docker cp $DATA_DIR/test.csv $CONTAINER_NAME:/app/
+
+echo "[4/6] Training model..."
+docker exec $CONTAINER_NAME python train.py \
+  --model_file model.pkl \
+  --data_file train.csv \
+  --overwrite_model
+
+echo "[5/6] Generating predictions..."
+docker exec $CONTAINER_NAME python predict.py \
+  --model_file model.pkl \
+  --input_file test.csv \
+  --predictions_file predictions.csv
+
+echo "[6/6] Retrieving results..."
+docker cp $CONTAINER_NAME:/app/model.pkl $MODELS_DIR/
+docker cp $CONTAINER_NAME:/app/predictions.csv $RESULTS_DIR/
+
+echo "Cleaning up..."
+docker stop $CONTAINER_NAME
+docker rm $CONTAINER_NAME
+
+echo "Pipeline complete!"
+echo "Model: $MODELS_DIR/model.pkl"
+echo "Predictions: $RESULTS_DIR/predictions.csv"
+```
+
+**Usage:**
+
+```bash
+chmod +x diabetes_pipeline.sh
+./diabetes_pipeline.sh
+```
+
+### Volume-Based Workflow
+
+Use volumes for persistent storage:
+
+```bash
+# Create directories
+mkdir -p ./data ./models ./output
+
+# Place data files
+cp train.csv ./data/
+cp test.csv ./data/
+
+# Run with volumes
+docker run -it \
+  --name ai-container \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/models:/app/models \
+  -v $(pwd)/output:/app/output \
+  ai-proyecto-sustituto /bin/bash
+
+# Inside container
+python train.py \
+  --model_file /app/models/model.pkl \
+  --data_file /app/data/train.csv \
+  --overwrite_model
+
+python predict.py \
+  --model_file /app/models/model.pkl \
+  --input_file /app/data/test.csv \
+  --predictions_file /app/output/predictions.csv
+
+# Exit container
+exit
+
+# Files are on host
+ls models/    # model.pkl
+ls output/    # predictions.csv
+```
+
+### Cron Job Automation
+
+Schedule daily predictions:
+
+```bash
+# crontab -e
+
+# Run diabetes predictions every day at 2 AM
+0 2 * * * /path/to/diabetes_pipeline.sh >> /var/log/diabetes_predictions.log 2>&1
+```
+
+### Python Integration
+
+Call CLI tools from Python:
+
+```python
+import subprocess
+import pandas as pd
+
+# Train model
+subprocess.run([
+    "docker", "exec", "ai-container",
+    "python", "train.py",
+    "--model_file", "model.pkl",
+    "--data_file", "train.csv",
+    "--overwrite_model"
+], check=True)
+
+# Generate predictions
+subprocess.run([
+    "docker", "exec", "ai-container",
+    "python", "predict.py",
+    "--model_file", "model.pkl",
+    "--input_file", "test.csv",
+    "--predictions_file", "predictions.csv"
+], check=True)
+
+# Copy and read results
+subprocess.run([
+    "docker", "cp",
+    "ai-container:/app/predictions.csv",
+    "./predictions.csv"
+], check=True)
+
+predictions = pd.read_csv("predictions.csv")
+print(f"Diabetes cases detected: {(predictions['preds'] == 1).sum()}")
+```
+
+## Performance Optimization
+
+### Parallel Processing
+
+For very large datasets, split and process in parallel:
+
+```bash
+# Split test.csv into chunks
+split -l 10000 test.csv test_chunk_
+
+# Process in parallel (requires GNU parallel)
+parallel -j 4 "docker exec ai-container python predict.py \
+  --model_file model.pkl \
+  --input_file {} \
+  --predictions_file {}.preds" ::: test_chunk_*
+
+# Combine results
+cat test_chunk_*.preds > predictions_all.csv
+```
+
+### Resource Allocation
+
+Allocate more resources for faster training:
+
+```bash
+docker run -it \
+  --name ai-container \
+  --cpus="4" \
+  --memory="8g" \
+  ai-proyecto-sustituto /bin/bash
+```
+
+## Comparison: CLI vs API
+
+| Feature | CLI (Phase 2) | API (Phase 3) |
+|---------|---------------|---------------|
+| **Input** | CSV files | JSON requests |
+| **Output** | CSV files | JSON responses |
+| **Best For** | Batch processing | Real-time queries |
+| **Integration** | Scripts, cron jobs | Web apps, mobile apps |
+| **Scalability** | Manual parallelization | Built-in concurrency |
+| **Ease of Use** | Command-line knowledge | HTTP requests |
+| **Debugging** | Terminal logs | API logs + Swagger UI |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Deployment" icon="cloud" href="/deployment/api-deployment">
+    For real-time predictions, explore the REST API
+  </Card>
+  
+  <Card title="Docker Setup" icon="docker" href="/deployment/docker-setup">
+    Advanced Docker configurations and best practices
+  </Card>
+  
+  <Card title="Phase 2 Guide" icon="book" href="/getting-started/phase-2-cli">
+    Complete Phase 2 walkthrough
+  </Card>
+  
+  <Card title="Model Architecture" icon="sitemap" href="/concepts/model-architecture">
+    Understand the underlying model
+  </Card>
+</CardGroup>

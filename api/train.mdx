@@ -1,0 +1,216 @@
+---
+title: POST /train
+description: Train the diabetes prediction model using the training dataset
+---
+
+## Endpoint
+
+```
+POST /train
+```
+
+Trains a Random Forest Classifier model using the data from `train.csv` and saves it to `model.pkl`. This endpoint must be called before making predictions.
+
+## Request
+
+This endpoint does not require any request body or parameters.
+
+### Headers
+
+No special headers are required for this endpoint.
+
+## Response
+
+<ResponseField name="message" type="string" required>
+  A message indicating the training result.
+  - Success: `"Model successfully trained"`
+  - Error: `"Something went wrong"`
+</ResponseField>
+
+## Training Process
+
+The training endpoint performs the following steps:
+
+1. **Load Training Data**: Reads data from `train.csv`
+2. **Encode Categorical Variables**:
+   - Gender: Female (0), Male (1), Other (2)
+   - Smoking History: No Info (0), current (1), ever (2), former (3), never (4), not current (5)
+3. **Feature Scaling**: Applies StandardScaler to normalize features
+4. **Resampling**: Uses SMOTEENN to handle class imbalance
+5. **Model Training**: Trains a Random Forest Classifier
+6. **Save Model**: Serializes the trained model to `model.pkl` using pickle
+
+<Info>
+If a model file already exists, it will be overwritten automatically (overwrite mode is enabled by default).
+</Info>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST http://localhost/train
+```
+
+```python Python
+import requests
+
+response = requests.post("http://localhost/train")
+print(response.json())
+
+# Expected output:
+# {'message': 'Model successfully trained'}
+```
+
+```javascript JavaScript
+fetch('http://localhost/train', {
+  method: 'POST'
+})
+.then(response => response.json())
+.then(data => console.log(data));
+
+// Expected output:
+// { message: 'Model successfully trained' }
+```
+
+```python Python (with error handling)
+import requests
+
+try:
+    response = requests.post("http://localhost/train")
+    response.raise_for_status()
+    
+    result = response.json()
+    
+    if result["message"] == "Model successfully trained":
+        print("✓ Model training completed successfully")
+    else:
+        print(f"✗ Training failed: {result['message']}")
+        
+except requests.exceptions.RequestException as e:
+    print(f"✗ Request failed: {e}")
+```
+
+</CodeGroup>
+
+## Response Examples
+
+### Success Response
+
+**Status Code**: `200 OK`
+
+```json
+{
+  "message": "Model successfully trained"
+}
+```
+
+### Error Response
+
+**Status Code**: `200 OK`
+
+```json
+{
+  "message": "Something went wrong"
+}
+```
+
+<Warning>
+Note that even when errors occur during training, the API returns a 200 status code with an error message. Check the response message to determine success or failure.
+</Warning>
+
+## Prerequisites
+
+<Steps>
+  <Step title="Training Data">
+    Ensure `train.csv` exists in the API's working directory with the following columns:
+    - gender
+    - age
+    - hypertension
+    - heart_disease
+    - smoking_history
+    - bmi
+    - HbA1c_level
+    - blood_glucose_level
+    - diabetes (target variable)
+  </Step>
+  
+  <Step title="Dependencies">
+    The following Python packages must be installed:
+    - scikit-learn (RandomForestClassifier, StandardScaler)
+    - imbalanced-learn (SMOTEENN)
+    - pandas
+    - pickle
+    - loguru
+  </Step>
+  
+  <Step title="Disk Space">
+    Ensure sufficient disk space is available to save the model file (`model.pkl`).
+  </Step>
+</Steps>
+
+## Model Configuration
+
+The trained model uses the following configuration:
+
+<ParamField path="model" type="RandomForestClassifier">
+  Random Forest Classifier with default scikit-learn parameters
+</ParamField>
+
+<ParamField path="scaler" type="StandardScaler">
+  StandardScaler for feature normalization
+</ParamField>
+
+<ParamField path="resampler" type="SMOTEENN">
+  SMOTEENN with random_state=42 for handling class imbalance
+</ParamField>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Missing train.csv file">
+    **Error**: Training fails because `train.csv` is not found.
+    
+    **Solution**: Ensure the `train.csv` file is present in the API's working directory with the correct column structure.
+  </Accordion>
+  
+  <Accordion title="Insufficient memory">
+    **Error**: Training fails due to memory constraints.
+    
+    **Solution**: Reduce the size of the training dataset or increase available system memory.
+  </Accordion>
+  
+  <Accordion title="Invalid data format">
+    **Error**: Training fails due to incorrect data types in train.csv.
+    
+    **Solution**: Verify that all columns have the correct data types (strings for categorical, numeric for continuous variables).
+  </Accordion>
+  
+  <Accordion title="Permission denied for model.pkl">
+    **Error**: Cannot write model file due to permission issues.
+    
+    **Solution**: Ensure the API has write permissions in the working directory.
+  </Accordion>
+</AccordionGroup>
+
+## Training Time
+
+Training time depends on several factors:
+
+- **Dataset size**: Larger datasets take longer to train
+- **CPU resources**: More CPU cores can speed up Random Forest training
+- **SMOTEENN resampling**: Adds overhead for balancing classes
+
+Typical training time for a dataset with ~100,000 rows: **30-120 seconds**
+
+## Next Steps
+
+After successfully training the model:
+
+1. Verify that `model.pkl` was created in the working directory
+2. Use the [POST /predict](/api/predict) endpoint to make predictions
+3. Monitor model performance and retrain periodically with updated data
+
+<Card title="Make Predictions" icon="stethoscope" href="/api/predict">
+  Learn how to use the trained model to make diabetes predictions
+</Card>

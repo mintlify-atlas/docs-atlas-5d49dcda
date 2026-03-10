@@ -1,0 +1,460 @@
+---
+title: POST /predict
+description: Make diabetes predictions based on patient health data
+---
+
+## Endpoint
+
+```
+POST /predict
+```
+
+Makes a diabetes prediction for a patient based on their health information. The model must be trained first using the [POST /train](/api/train) endpoint.
+
+## Request
+
+### Headers
+
+```
+Content-Type: application/json
+```
+
+### Body
+
+The request body must contain a valid [Patient](/api/patient-model) object with all required fields.
+
+<ParamField body="gender" type="string" required>
+  Patient's gender. Must be one of:
+  - `Female`
+  - `Male`
+  - `Other`
+</ParamField>
+
+<ParamField body="age" type="integer" required>
+  Patient's age in years (e.g., 45)
+</ParamField>
+
+<ParamField body="hypertension" type="integer" required>
+  Whether the patient has hypertension:
+  - `0`: No hypertension
+  - `1`: Has hypertension
+</ParamField>
+
+<ParamField body="heart_disease" type="integer" required>
+  Whether the patient has heart disease:
+  - `0`: No heart disease
+  - `1`: Has heart disease
+</ParamField>
+
+<ParamField body="smoking_history" type="string" required>
+  Patient's smoking history. Must be one of:
+  - `never`: Never smoked
+  - `former`: Former smoker
+  - `current`: Current smoker
+  - `not current`: Not currently smoking
+  - `ever`: Has smoked at some point
+  - `No Info`: No information available
+</ParamField>
+
+<ParamField body="bmi" type="float" required>
+  Body Mass Index (BMI) of the patient (e.g., 27.5)
+</ParamField>
+
+<ParamField body="HbA1c_level" type="float" required>
+  Hemoglobin A1c level, a measure of average blood sugar over 2-3 months (e.g., 5.7)
+  
+  **Normal range**: 4.0 - 5.6%
+  
+  **Prediabetes**: 5.7 - 6.4%
+  
+  **Diabetes**: 6.5% or higher
+</ParamField>
+
+<ParamField body="blood_glucose_level" type="integer" required>
+  Blood glucose level in mg/dL (e.g., 140)
+  
+  **Normal (fasting)**: 70 - 100 mg/dL
+  
+  **Prediabetes**: 100 - 125 mg/dL
+  
+  **Diabetes**: 126 mg/dL or higher
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string" required>
+  Prediction result. Possible values:
+  - `"Tiene diabetes"`: Patient is predicted to have diabetes
+  - `"No tiene diabetes"`: Patient is predicted not to have diabetes
+  - `"Something went wrong"`: An error occurred during prediction
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL - No Diabetes
+curl -X POST http://localhost/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gender": "Female",
+    "age": 35,
+    "hypertension": 0,
+    "heart_disease": 0,
+    "smoking_history": "never",
+    "bmi": 22.5,
+    "HbA1c_level": 5.2,
+    "blood_glucose_level": 90
+  }'
+```
+
+```bash cURL - Has Diabetes
+curl -X POST http://localhost/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gender": "Male",
+    "age": 58,
+    "hypertension": 1,
+    "heart_disease": 1,
+    "smoking_history": "current",
+    "bmi": 32.1,
+    "HbA1c_level": 7.8,
+    "blood_glucose_level": 180
+  }'
+```
+
+```python Python
+import requests
+
+# Example 1: Healthy patient
+patient_healthy = {
+    "gender": "Female",
+    "age": 35,
+    "hypertension": 0,
+    "heart_disease": 0,
+    "smoking_history": "never",
+    "bmi": 22.5,
+    "HbA1c_level": 5.2,
+    "blood_glucose_level": 90
+}
+
+response = requests.post(
+    "http://localhost/predict",
+    json=patient_healthy
+)
+print(response.json())
+# Output: {'message': 'No tiene diabetes'}
+
+# Example 2: High-risk patient
+patient_high_risk = {
+    "gender": "Male",
+    "age": 58,
+    "hypertension": 1,
+    "heart_disease": 1,
+    "smoking_history": "current",
+    "bmi": 32.1,
+    "HbA1c_level": 7.8,
+    "blood_glucose_level": 180
+}
+
+response = requests.post(
+    "http://localhost/predict",
+    json=patient_high_risk
+)
+print(response.json())
+# Output: {'message': 'Tiene diabetes'}
+```
+
+```javascript JavaScript
+// Example 1: Healthy patient
+const patientHealthy = {
+  gender: "Female",
+  age: 35,
+  hypertension: 0,
+  heart_disease: 0,
+  smoking_history: "never",
+  bmi: 22.5,
+  HbA1c_level: 5.2,
+  blood_glucose_level: 90
+};
+
+fetch('http://localhost/predict', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(patientHealthy)
+})
+.then(response => response.json())
+.then(data => console.log(data));
+// Output: { message: 'No tiene diabetes' }
+
+// Example 2: High-risk patient
+const patientHighRisk = {
+  gender: "Male",
+  age: 58,
+  hypertension: 1,
+  heart_disease: 1,
+  smoking_history: "current",
+  bmi: 32.1,
+  HbA1c_level: 7.8,
+  blood_glucose_level: 180
+};
+
+fetch('http://localhost/predict', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(patientHighRisk)
+})
+.then(response => response.json())
+.then(data => console.log(data));
+// Output: { message: 'Tiene diabetes' }
+```
+
+```python Python (with error handling)
+import requests
+from typing import Dict
+
+def predict_diabetes(patient_data: Dict) -> str:
+    """
+    Make a diabetes prediction for a patient.
+    
+    Args:
+        patient_data: Dictionary containing patient information
+        
+    Returns:
+        Prediction message string
+    """
+    try:
+        response = requests.post(
+            "http://localhost/predict",
+            json=patient_data,
+            timeout=10
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        return result.get("message", "Unknown response")
+        
+    except requests.exceptions.Timeout:
+        return "Request timed out"
+    except requests.exceptions.RequestException as e:
+        return f"Request failed: {e}"
+    except Exception as e:
+        return f"Unexpected error: {e}"
+
+# Usage
+patient = {
+    "gender": "Female",
+    "age": 45,
+    "hypertension": 0,
+    "heart_disease": 0,
+    "smoking_history": "never",
+    "bmi": 27.5,
+    "HbA1c_level": 5.7,
+    "blood_glucose_level": 140
+}
+
+prediction = predict_diabetes(patient)
+print(f"Prediction: {prediction}")
+```
+
+</CodeGroup>
+
+## Response Examples
+
+### Success - No Diabetes
+
+**Status Code**: `200 OK`
+
+```json
+{
+  "message": "No tiene diabetes"
+}
+```
+
+### Success - Has Diabetes
+
+**Status Code**: `200 OK`
+
+```json
+{
+  "message": "Tiene diabetes"
+}
+```
+
+### Error Response
+
+**Status Code**: `200 OK`
+
+```json
+{
+  "message": "Something went wrong"
+}
+```
+
+### Validation Error
+
+**Status Code**: `422 Unprocessable Entity`
+
+When required fields are missing or have invalid values:
+
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "age"],
+      "msg": "field required",
+      "type": "value_error.missing"
+    },
+    {
+      "loc": ["body", "bmi"],
+      "msg": "value is not a valid float",
+      "type": "type_error.float"
+    }
+  ]
+}
+```
+
+## Prediction Process
+
+The prediction endpoint performs the following steps:
+
+<Steps>
+  <Step title="Validate Input">
+    Validates that all required Patient fields are present and correctly typed using Pydantic validation.
+  </Step>
+  
+  <Step title="Load Model">
+    Checks if `model.pkl` exists and loads the trained model. Returns an error if the model hasn't been trained yet.
+  </Step>
+  
+  <Step title="Encode Data">
+    Converts categorical variables to numeric codes:
+    - Gender: Female (0), Male (1), Other (2)
+    - Smoking History: No Info (0), current (1), ever (2), former (3), never (4), not current (5)
+  </Step>
+  
+  <Step title="Scale Features">
+    Applies StandardScaler to normalize all features to the same scale.
+  </Step>
+  
+  <Step title="Make Prediction">
+    Uses the trained Random Forest model to predict diabetes (0 or 1).
+  </Step>
+  
+  <Step title="Return Result">
+    Returns a human-readable message based on the prediction:
+    - `1` → "Tiene diabetes"
+    - `0` → "No tiene diabetes"
+  </Step>
+</Steps>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Model not trained">
+    **Error**: Prediction fails because `model.pkl` doesn't exist.
+    
+    **Solution**: Train the model first using [POST /train](/api/train) before making predictions.
+    
+    ```bash
+    curl -X POST http://localhost/train
+    ```
+  </Accordion>
+  
+  <Accordion title="Invalid gender value">
+    **Error**: 422 validation error for gender field.
+    
+    **Solution**: Ensure gender is exactly one of: `Female`, `Male`, or `Other` (case-sensitive).
+  </Accordion>
+  
+  <Accordion title="Invalid smoking_history value">
+    **Error**: 422 validation error for smoking_history field.
+    
+    **Solution**: Use one of the valid values: `never`, `former`, `current`, `not current`, `ever`, or `No Info`.
+  </Accordion>
+  
+  <Accordion title="Missing required fields">
+    **Error**: 422 validation error with "field required" message.
+    
+    **Solution**: Include all 8 required fields in the request body. See the [Patient Model](/api/patient-model) for details.
+  </Accordion>
+  
+  <Accordion title="Wrong data types">
+    **Error**: 422 validation error with "value is not a valid" message.
+    
+    **Solution**: Ensure correct data types:
+    - Strings: gender, smoking_history
+    - Integers: age, hypertension, heart_disease, blood_glucose_level
+    - Floats: bmi, HbA1c_level
+  </Accordion>
+</AccordionGroup>
+
+## Understanding Results
+
+<Note>
+The prediction is based on machine learning and should be used as a screening tool only. Always consult healthcare professionals for medical diagnosis.
+</Note>
+
+### Risk Factors
+
+The model considers multiple risk factors when making predictions:
+
+1. **Age**: Diabetes risk increases with age
+2. **BMI**: Higher BMI correlates with increased diabetes risk
+3. **HbA1c Level**: Direct indicator of blood sugar control
+4. **Blood Glucose Level**: Key diagnostic marker
+5. **Hypertension**: Often co-occurs with diabetes
+6. **Heart Disease**: Shares risk factors with diabetes
+7. **Smoking History**: Increases diabetes risk
+8. **Gender**: May influence risk patterns
+
+### Interpreting Predictions
+
+<CardGroup cols={2}>
+  <Card title="No tiene diabetes" icon="circle-check" color="#10b981">
+    The model predicts the patient does not have diabetes based on their health metrics.
+    
+    **Note**: This is a screening prediction, not a medical diagnosis.
+  </Card>
+  
+  <Card title="Tiene diabetes" icon="triangle-exclamation" color="#ef4444">
+    The model predicts the patient may have diabetes based on their health metrics.
+    
+    **Recommendation**: Consult a healthcare provider for proper testing and diagnosis.
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Validate data before sending">
+    Ensure all patient data is accurate and in the correct format before making API calls.
+  </Step>
+  
+  <Step title="Handle errors gracefully">
+    Implement proper error handling in your application to manage validation errors and API failures.
+  </Step>
+  
+  <Step title="Don't rely solely on predictions">
+    Use predictions as a screening tool alongside clinical judgment and proper medical testing.
+  </Step>
+  
+  <Step title="Keep the model updated">
+    Retrain the model periodically with new data to maintain prediction accuracy.
+  </Step>
+</Steps>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Patient Model Schema" icon="file-code" href="/api/patient-model">
+    Complete reference for the Patient data model
+  </Card>
+  <Card title="Train Endpoint" icon="brain" href="/api/train">
+    Learn how to train the prediction model
+  </Card>
+</CardGroup>

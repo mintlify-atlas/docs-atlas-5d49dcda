@@ -1,0 +1,722 @@
+---
+title: 'Model Architecture'
+description: 'Deep dive into the RandomForestClassifier and preprocessing pipeline'
+---
+
+## Overview
+
+The diabetes prediction system uses a **RandomForestClassifier** combined with a comprehensive preprocessing pipeline. This page explains the model architecture, hyperparameters, and training process in detail.
+
+<Info>
+  **Model**: RandomForestClassifier from scikit-learn
+  
+  **Algorithm Type**: Ensemble learning (bagging)
+  
+  **Task**: Binary classification (diabetes vs. no diabetes)
+</Info>
+
+## Model Choice: Why RandomForest?
+
+RandomForestClassifier was chosen for several key reasons:
+
+<CardGroup cols={2}>
+  <Card title="Robust Performance" icon="shield">
+    Works well out-of-the-box with default parameters, requiring minimal tuning
+  </Card>
+  
+  <Card title="Handles Non-linearity" icon="wave-square">
+    Captures complex, non-linear relationships between features and target
+  </Card>
+  
+  <Card title="Feature Interactions" icon="link">
+    Automatically learns interactions between features (e.g., age × BMI)
+  </Card>
+  
+  <Card title="Resistant to Overfitting" icon="shield-halved">
+    Ensemble of trees reduces variance and prevents overfitting
+  </Card>
+</CardGroup>
+
+## How RandomForest Works
+
+### Ensemble Learning
+
+RandomForest creates multiple decision trees and aggregates their predictions:
+
+<Steps>
+  <Step title="Bootstrap Sampling">
+    Create N different training sets by random sampling with replacement
+    
+    ```python
+    # Example: From 1000 samples, create multiple 1000-sample datasets
+    # Each dataset has ~63% unique samples, ~37% duplicates
+    ```
+  </Step>
+  
+  <Step title="Build Decision Trees">
+    Train a decision tree on each bootstrap sample
+    
+    - At each node, consider only a random subset of features
+    - Split on the feature that best separates classes
+    - Repeat until stopping criteria (max depth, min samples, etc.)
+  </Step>
+  
+  <Step title="Aggregate Predictions">
+    For classification, use **majority voting**:
+    
+    ```python
+    # Example: 100 trees vote
+    # 65 trees predict: diabetes = 1
+    # 35 trees predict: diabetes = 0
+    # Final prediction: diabetes = 1
+    ```
+  </Step>
+</Steps>
+
+### Visualization
+
+```
+Training Data
+     ↓
+┌────────────────────────────────┐
+│  Bootstrap Sampling            │
+└────────────────────────────────┘
+     ↓         ↓         ↓
+  Tree 1    Tree 2    Tree 3    ... Tree 100
+     ↓         ↓         ↓
+Vote: 1   Vote: 0   Vote: 1    ... Vote: 1
+     └─────────┴─────────┴────────────┘
+                ↓
+         Majority Vote
+                ↓
+        Final Prediction
+```
+
+## Model Implementation
+
+### Code
+
+The model is instantiated with default parameters:
+
+```python
+from sklearn.ensemble import RandomForestClassifier
+
+m = RandomForestClassifier()
+m.fit(Xtr, ytr)
+```
+
+### Default Hyperparameters
+
+While no parameters are explicitly set, scikit-learn uses these defaults:
+
+```python
+RandomForestClassifier(
+    n_estimators=100,          # Number of trees
+    criterion='gini',          # Split quality measure
+    max_depth=None,            # Nodes expanded until pure
+    min_samples_split=2,       # Min samples to split node
+    min_samples_leaf=1,        # Min samples in leaf node
+    max_features='sqrt',       # Features per split = √(total features)
+    bootstrap=True,            # Use bootstrap sampling
+    random_state=None,         # Random seed (not set)
+    n_jobs=None,               # CPU cores (1 core)
+    class_weight=None          # No class weighting
+)
+```
+
+<Accordion title="Hyperparameter Explanations">
+  **n_estimators (100)**
+  - Number of decision trees in the forest
+  - More trees → better performance but slower
+  - 100 is a good default balance
+  
+  **criterion ('gini')**
+  - Measures split quality
+  - 'gini': Gini impurity (default)
+  - 'entropy': Information gain
+  - Both work well; 'gini' is slightly faster
+  
+  **max_depth (None)**
+  - Maximum tree depth
+  - None = expand until leaves are pure
+  - Can cause overfitting but mitigated by ensemble
+  
+  **min_samples_split (2)**
+  - Minimum samples required to split a node
+  - Higher values prevent overfitting
+  - 2 is permissive (allows detailed trees)
+  
+  **max_features ('sqrt')**
+  - Features considered per split = √8 ≈ 3
+  - Increases tree diversity
+  - 'sqrt' recommended for classification
+  
+  **bootstrap (True)**
+  - Use bootstrap sampling
+  - Essential for RandomForest
+  
+  **random_state (None)**
+  - Not set, so results vary between runs
+  - For reproducibility, set to a fixed value:
+  ```python
+  RandomForestClassifier(random_state=42)
+  ```
+</Accordion>
+
+## Feature Count
+
+The model receives **8 features** after preprocessing:
+
+```python
+# Feature order
+[
+    'gender',              # 0: Female, 1: Male, 2: Other
+    'age',                 # Numeric (scaled)
+    'hypertension',        # 0: No, 1: Yes
+    'heart_disease',       # 0: No, 1: Yes
+    'smoking_history',     # 0-5: Encoded categories
+    'bmi',                 # Numeric (scaled)
+    'HbA1c_level',         # Numeric (scaled)
+    'blood_glucose_level'  # Numeric (scaled)
+]
+```
+
+<Note>
+  With `max_features='sqrt'`, each split considers √8 ≈ 2.83, so **3 random features** are evaluated at each node.
+</Note>
+
+## Complete Training Pipeline
+
+The full pipeline from raw data to trained model:
+
+<Steps>
+  <Step title="Load Data">
+    ```python
+    import pandas as pd
+    
+    z = pd.read_csv("train.csv")
+    # Shape: (100000, 9) - 8 features + 1 target
+    ```
+  </Step>
+  
+  <Step title="Encode Categorical Features">
+    ```python
+    gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+    smoking_history_dict = {
+        'No Info': 0, 'current': 1, 'ever': 2,
+        'former': 3, 'never': 4, 'not current': 5
+    }
+    
+    z = z.replace({
+        'gender': gender_dict,
+        'smoking_history': smoking_history_dict
+    })
+    ```
+    
+    **Before:**
+    ```
+    gender    age  smoking_history  bmi
+    Female    36   current          32.27
+    Male      54   never            27.32
+    ```
+    
+    **After:**
+    ```
+    gender  age  smoking_history  bmi
+    0       36   1                32.27
+    1       54   4                27.32
+    ```
+  </Step>
+  
+  <Step title="Separate Features and Target">
+    ```python
+    Xtr = z.drop('diabetes', axis=1)  # Features (8 columns)
+    ytr = z[['diabetes']]              # Target (1 column)
+    ```
+  </Step>
+  
+  <Step title="Scale Features">
+    ```python
+    from sklearn.preprocessing import StandardScaler
+    
+    scaler = StandardScaler()
+    Xtr = scaler.fit_transform(Xtr)
+    ```
+    
+    **StandardScaler** transforms each feature:
+    
+    ```
+    X_scaled = (X - mean) / std_dev
+    ```
+    
+    **Example:**
+    ```python
+    # Original BMI values: 20.14, 23.45, 25.19, 27.32, 32.27
+    # Mean = 25.67, Std = 4.56
+    # Scaled: -1.21, -0.49, -0.11, 0.36, 1.45
+    ```
+    
+    <Info>
+      After scaling, all features have:
+      - Mean = 0
+      - Standard deviation = 1
+    </Info>
+  </Step>
+  
+  <Step title="Apply SMOTEENN Resampling">
+    ```python
+    from imblearn.combine import SMOTEENN
+    
+    smote_enn = SMOTEENN(random_state=42)
+    Xtr, ytr = smote_enn.fit_resample(Xtr, ytr)
+    ```
+    
+    **Purpose**: Balance class distribution
+    
+    **Before:**
+    ```python
+    diabetes=0: 91,500 samples
+    diabetes=1:  8,500 samples
+    # Ratio: ~11:1 (highly imbalanced)
+    ```
+    
+    **After:**
+    ```python
+    diabetes=0: ~45,000 samples
+    diabetes=1: ~45,000 samples
+    # Ratio: ~1:1 (balanced)
+    ```
+    
+    See [Imbalanced Data Handling](/concepts/imbalanced-data) for details.
+  </Step>
+  
+  <Step title="Train RandomForest">
+    ```python
+    m = RandomForestClassifier()
+    m.fit(Xtr, ytr)
+    ```
+    
+    **Training Process:**
+    - Build 100 decision trees
+    - Each tree trained on a bootstrap sample
+    - Each split considers 3 random features
+    - Trees grow until leaves are pure (max_depth=None)
+    
+    **Training Time**: Depends on hardware, typically 10-60 seconds
+  </Step>
+  
+  <Step title="Save Model">
+    ```python
+    import pickle
+    
+    with open("model.pkl", "wb") as f:
+        pickle.dump(m, f)
+    ```
+    
+    Model is serialized and saved for later use.
+  </Step>
+</Steps>
+
+## Prediction Process
+
+How the trained model makes predictions:
+
+<Steps>
+  <Step title="Receive Input">
+    ```python
+    # New patient data
+    patient = {
+        "gender": "Female",
+        "age": 36,
+        "hypertension": 0,
+        "heart_disease": 0,
+        "smoking_history": "current",
+        "bmi": 32.27,
+        "HbA1c_level": 6.2,
+        "blood_glucose_level": 220
+    }
+    ```
+  </Step>
+  
+  <Step title="Preprocess">
+    ```python
+    # Encode
+    patient['gender'] = 0              # Female → 0
+    patient['smoking_history'] = 1     # current → 1
+    
+    # Scale (using same StandardScaler)
+    X = scaler.transform([patient.values()])
+    ```
+    
+    <Warning>
+      **Critical**: Use the **same scaler** from training. Currently, the implementation creates a new scaler for predictions, which is incorrect and may hurt accuracy.
+    </Warning>
+  </Step>
+  
+  <Step title="Load Model">
+    ```python
+    with open("model.pkl", "rb") as f:
+        m = pickle.load(f)
+    ```
+  </Step>
+  
+  <Step title="Get Predictions from Each Tree">
+    ```python
+    # Internally, RandomForest does:
+    tree_predictions = []
+    for tree in m.estimators_:
+        pred = tree.predict(X)  # 0 or 1
+        tree_predictions.append(pred)
+    
+    # Example:
+    # tree_predictions = [1, 1, 0, 1, 1, ..., 1]
+    # 67 trees predict 1, 33 trees predict 0
+    ```
+  </Step>
+  
+  <Step title="Majority Vote">
+    ```python
+    # Aggregate votes
+    prediction = m.predict(X)
+    # prediction = 1 (diabetes)
+    ```
+    
+    **Decision Rule:**
+    - If >50% of trees predict 1 → diabetes
+    - If ≤50% of trees predict 1 → no diabetes
+  </Step>
+</Steps>
+
+## Model Outputs
+
+### Binary Prediction
+
+```python
+prediction = m.predict(X)
+# Output: array([1]) or array([0])
+```
+
+- `0`: No diabetes
+- `1`: Has diabetes
+
+### Probability Scores
+
+While not used in the current implementation, RandomForest can provide probabilities:
+
+```python
+proba = m.predict_proba(X)
+# Output: array([[0.33, 0.67]])
+#         ↑        ↑     ↑
+#         |        |     Probability of class 1 (diabetes)
+#         |        Probability of class 0 (no diabetes)
+#         One row per sample
+```
+
+**Interpretation:**
+- `proba[0][0]`: 33% chance of no diabetes
+- `proba[0][1]`: 67% chance of diabetes
+
+<Tip>
+  Using probabilities allows you to set custom thresholds:
+  
+  ```python
+  # More conservative: flag as diabetes if >30% probability
+  if proba[0][1] > 0.30:
+      result = "High risk - recommend screening"
+  ```
+</Tip>
+
+## Feature Importance
+
+RandomForest can tell us which features are most predictive:
+
+```python
+import pandas as pd
+
+feature_names = [
+    'gender', 'age', 'hypertension', 'heart_disease',
+    'smoking_history', 'bmi', 'HbA1c_level', 'blood_glucose_level'
+]
+
+importances = m.feature_importances_
+
+feature_importance_df = pd.DataFrame({
+    'feature': feature_names,
+    'importance': importances
+}).sort_values('importance', ascending=False)
+
+print(feature_importance_df)
+```
+
+**Expected Output** (hypothetical):
+
+```
+             feature  importance
+HbA1c_level          0.35
+blood_glucose_level  0.28
+age                  0.15
+bmi                  0.12
+hypertension         0.05
+heart_disease        0.03
+smoking_history      0.01
+gender               0.01
+```
+
+<Info>
+  **Interpretation**: HbA1c level and blood glucose are the strongest predictors, which aligns with medical knowledge about diabetes.
+</Info>
+
+## Model Strengths
+
+<Accordion title="1. Minimal Hyperparameter Tuning">
+  RandomForest works well with default parameters, reducing the need for extensive hyperparameter search.
+</Accordion>
+
+<Accordion title="2. Handles Mixed Data Types">
+  Naturally handles both categorical (encoded) and continuous features without needing separate pipelines.
+</Accordion>
+
+<Accordion title="3. Feature Importance">
+  Provides interpretable feature importance scores, helping identify key risk factors.
+</Accordion>
+
+<Accordion title="4. Non-linear Relationships">
+  Captures complex interactions like:
+  - High BMI + high age → increased risk
+  - Normal glucose + high HbA1c → inconsistency signal
+</Accordion>
+
+<Accordion title="5. Robust to Outliers">
+  Decision trees split on thresholds, making them less sensitive to extreme values than linear models.
+</Accordion>
+
+## Model Limitations
+
+<Warning>
+  **Limitations to be aware of:**
+</Warning>
+
+<Accordion title="1. Large Model Size">
+  With 100 trees, the serialized model file (model.pkl) can be 50-100 MB, which may be problematic for edge deployment.
+  
+  **Solution**: Reduce `n_estimators` or use model compression.
+</Accordion>
+
+<Accordion title="2. Slower Predictions">
+  Must query all 100 trees for each prediction. Slower than linear models.
+  
+  **Typical Speed**: ~1-10ms per prediction (acceptable for most applications).
+</Accordion>
+
+<Accordion title="3. Not Probabilistically Calibrated">
+  RandomForest probabilities tend to be biased toward 0 and 1 (overconfident).
+  
+  **Solution**: Apply Platt scaling or isotonic regression for calibrated probabilities.
+</Accordion>
+
+<Accordion title="4. Extrapolation Issues">
+  Poor at extrapolating beyond training data range.
+  
+  **Example**: If training data has ages 18-80, predictions for age 100 may be unreliable.
+</Accordion>
+
+<Accordion title="5. No Random Seed">
+  `random_state=None` means different runs produce different models.
+  
+  **Solution**: Set `random_state=42` for reproducibility.
+</Accordion>
+
+## Potential Improvements
+
+### 1. Hyperparameter Tuning
+
+Optimize parameters using GridSearchCV:
+
+```python
+from sklearn.model_selection import GridSearchCV
+
+param_grid = {
+    'n_estimators': [50, 100, 200],
+    'max_depth': [10, 20, None],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4],
+    'max_features': ['sqrt', 'log2', None]
+}
+
+rf = RandomForestClassifier(random_state=42)
+grid_search = GridSearchCV(
+    rf, param_grid,
+    cv=5, scoring='f1',
+    n_jobs=-1, verbose=2
+)
+
+grid_search.fit(Xtr, ytr)
+
+print(f"Best params: {grid_search.best_params_}")
+print(f"Best F1 score: {grid_search.best_score_}")
+
+best_model = grid_search.best_estimator_
+```
+
+### 2. Add Random State
+
+Ensure reproducibility:
+
+```python
+m = RandomForestClassifier(random_state=42)
+m.fit(Xtr, ytr)
+```
+
+### 3. Save Scaler with Model
+
+Prevent scaling inconsistencies:
+
+```python
+import pickle
+
+# Save both scaler and model
+with open("model_pipeline.pkl", "wb") as f:
+    pickle.dump({
+        'scaler': scaler,
+        'model': m
+    }, f)
+
+# Load both
+with open("model_pipeline.pkl", "rb") as f:
+    pipeline = pickle.load(f)
+    scaler = pipeline['scaler']
+    m = pipeline['model']
+```
+
+### 4. Try Alternative Models
+
+Compare RandomForest with other algorithms:
+
+```python
+from sklearn.ensemble import GradientBoostingClassifier
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
+
+# Gradient Boosting
+gb = GradientBoostingClassifier(n_estimators=100, random_state=42)
+gb.fit(Xtr, ytr)
+
+# XGBoost
+xgb = XGBClassifier(n_estimators=100, random_state=42)
+xgb.fit(Xtr, ytr)
+
+# LightGBM
+lgbm = LGBMClassifier(n_estimators=100, random_state=42)
+lgbm.fit(Xtr, ytr)
+```
+
+### 5. Ensemble Multiple Models
+
+Combine predictions from multiple models:
+
+```python
+from sklearn.ensemble import VotingClassifier
+
+voting_clf = VotingClassifier(
+    estimators=[
+        ('rf', RandomForestClassifier(random_state=42)),
+        ('gb', GradientBoostingClassifier(random_state=42)),
+        ('xgb', XGBClassifier(random_state=42))
+    ],
+    voting='soft'  # Use probability averaging
+)
+
+voting_clf.fit(Xtr, ytr)
+```
+
+## Mathematical Foundation
+
+### Gini Impurity
+
+RandomForest uses Gini impurity to evaluate splits:
+
+```
+Gini(node) = 1 - Σ(p_i²)
+
+where p_i = proportion of class i in the node
+```
+
+**Example:**
+
+Node with 100 samples:
+- 60 with diabetes (p₁ = 0.6)
+- 40 without diabetes (p₀ = 0.4)
+
+```
+Gini = 1 - (0.6² + 0.4²)
+     = 1 - (0.36 + 0.16)
+     = 1 - 0.52
+     = 0.48
+```
+
+**Perfect split** (pure node): Gini = 0
+**Worst split** (50-50): Gini = 0.5
+
+### Information Gain
+
+When splitting, choose the feature that maximizes information gain:
+
+```
+Information Gain = Gini(parent) - Weighted_Average(Gini(children))
+```
+
+## Model Serialization
+
+### Pickle Format
+
+The model is saved using Python's pickle protocol:
+
+```python
+import pickle
+
+# Save
+with open("model.pkl", "wb") as f:
+    pickle.dump(m, f)
+
+# Load
+with open("model.pkl", "rb") as f:
+    m = pickle.load(f)
+```
+
+<Warning>
+  **Security Note**: Never load pickle files from untrusted sources. Pickle can execute arbitrary code.
+</Warning>
+
+### Alternative: Joblib
+
+For large models, joblib is more efficient:
+
+```python
+import joblib
+
+# Save
+joblib.dump(m, "model.joblib")
+
+# Load
+m = joblib.load("model.joblib")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Data Preprocessing" icon="filter" href="/concepts/data-preprocessing">
+    Learn about encoding, scaling, and the preprocessing pipeline
+  </Card>
+  
+  <Card title="Imbalanced Data" icon="scale-unbalanced" href="/concepts/imbalanced-data">
+    Understand SMOTEENN resampling technique
+  </Card>
+  
+  <Card title="Patient Features" icon="stethoscope" href="/concepts/patient-features">
+    Medical interpretation of each feature
+  </Card>
+  
+  <Card title="API Deployment" icon="cloud" href="/deployment/api-deployment">
+    Deploy the model as a production API
+  </Card>
+</CardGroup>

@@ -1,0 +1,146 @@
+---
+title: 'Features'
+description: 'Comprehensive overview of the Diabetes Prediction ML project capabilities'
+---
+
+## Project Overview
+
+The Diabetes Prediction ML project is a complete machine learning solution that predicts diabetes risk using patient medical and demographic data. The project demonstrates a full ML development lifecycle from exploration to production deployment.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Machine Learning Model" icon="brain">
+    RandomForestClassifier trained on 100,000 patient records with advanced handling for imbalanced datasets
+  </Card>
+  
+  <Card title="Three Development Phases" icon="layer-group">
+    Progressive evolution from Jupyter notebook exploration to REST API deployment
+  </Card>
+  
+  <Card title="Docker Containerization" icon="docker">
+    Fully containerized deployments for both CLI and API interfaces
+  </Card>
+  
+  <Card title="FastAPI REST API" icon="cloud">
+    Production-ready API with automatic Swagger documentation
+  </Card>
+</CardGroup>
+
+## Dataset Characteristics
+
+The project uses the [Diabetes Prediction Dataset](https://www.kaggle.com/datasets/iammustafatz/diabetes-prediction-dataset) from Kaggle, containing:
+
+- **100,000 patient records**
+- **8 input features** (medical and demographic)
+- **1 target variable** (diabetes status: 0 or 1)
+
+<Info>
+  The dataset exhibits significant class imbalance, with far fewer positive diabetes cases than negative cases. This is addressed using SMOTEENN resampling technique.
+</Info>
+
+## Patient Features
+
+The model analyzes the following patient characteristics:
+
+| Feature | Type | Description | Example Values |
+|---------|------|-------------|----------------|
+| `gender` | Categorical | Patient's gender | Female, Male, Other |
+| `age` | Numeric | Patient's age in years | 36, 54, 80 |
+| `hypertension` | Binary | Presence of hypertension | 0 (no), 1 (yes) |
+| `heart_disease` | Binary | Presence of heart disease | 0 (no), 1 (yes) |
+| `smoking_history` | Categorical | Smoking status | never, current, former, ever, not current, No Info |
+| `bmi` | Numeric | Body Mass Index | 23.45, 27.32, 32.27 |
+| `HbA1c_level` | Numeric | Hemoglobin A1c level (%) | 5.0, 6.2, 6.6 |
+| `blood_glucose_level` | Numeric | Blood glucose level (mg/dL) | 140, 158, 220 |
+
+## Technical Stack
+
+<Tabs>
+  <Tab title="Core Libraries">
+    ```txt
+    scikit-learn==1.4.1.post1    # Machine learning algorithms
+    pandas==2.2.1                 # Data manipulation
+    imbalanced-learn==0.12.0      # SMOTEENN for imbalanced data
+    ```
+  </Tab>
+  
+  <Tab title="API Framework">
+    ```txt
+    fastapi==0.111.0              # REST API framework
+    pydantic                      # Data validation
+    uvicorn                       # ASGI server
+    ```
+  </Tab>
+  
+  <Tab title="Utilities">
+    ```txt
+    loguru==0.7.2                 # Structured logging
+    argparse                      # CLI argument parsing
+    ```
+  </Tab>
+</Tabs>
+
+## Development Phases
+
+<Steps>
+  <Step title="Phase 1: Exploration">
+    Interactive Jupyter notebook for data exploration, model training, and evaluation in Google Colab.
+    
+    **Best for:** Understanding the dataset, experimenting with features, and initial model development.
+  </Step>
+  
+  <Step title="Phase 2: CLI Tools">
+    Docker-based command-line interface with separate `train.py` and `predict.py` scripts.
+    
+    **Best for:** Batch predictions, automated pipelines, and local development.
+  </Step>
+  
+  <Step title="Phase 3: REST API">
+    FastAPI-based REST API with endpoints for training and real-time predictions.
+    
+    **Best for:** Production deployments, web integrations, and microservices architecture.
+  </Step>
+</Steps>
+
+## Model Performance
+
+The RandomForestClassifier is trained with the following preprocessing pipeline:
+
+1. **Categorical Encoding**: Gender and smoking history converted to numeric codes
+2. **Feature Scaling**: StandardScaler normalization for all features
+3. **Resampling**: SMOTEENN (SMOTE + Edited Nearest Neighbors) to handle class imbalance
+4. **Training**: RandomForestClassifier with default hyperparameters
+
+<Warning>
+  The model must be trained before making predictions. In Phase 2 and 3, ensure you run the training step first to generate the `model.pkl` file.
+</Warning>
+
+## Use Cases
+
+Healthcare professionals and researchers can use this system to:
+
+- **Risk Assessment**: Identify patients at high risk of developing diabetes
+- **Early Detection**: Screen large populations for diabetes indicators
+- **Treatment Planning**: Develop personalized prevention strategies
+- **Research**: Explore relationships between medical/demographic factors and diabetes likelihood
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/getting-started/quickstart">
+    Get up and running with your first prediction in minutes
+  </Card>
+  
+  <Card title="Dataset Details" icon="database" href="/overview/dataset">
+    Deep dive into the dataset structure and characteristics
+  </Card>
+  
+  <Card title="Model Architecture" icon="sitemap" href="/concepts/model-architecture">
+    Understand the RandomForest model and preprocessing pipeline
+  </Card>
+  
+  <Card title="Docker Setup" icon="docker" href="/deployment/docker-setup">
+    Deploy the application using Docker containers
+  </Card>
+</CardGroup>

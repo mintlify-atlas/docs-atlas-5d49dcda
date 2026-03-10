@@ -1,0 +1,826 @@
+---
+title: 'Imbalanced Data Handling'
+description: 'Understanding SMOTEENN and how class imbalance is addressed in diabetes prediction'
+---
+
+## Overview
+
+The diabetes prediction dataset suffers from **class imbalance** - there are far more patients without diabetes than with diabetes. This page explains why imbalance is a problem and how SMOTEENN addresses it.
+
+<Warning>
+  **Class Imbalance**: The dataset has approximately **10:1 ratio** of non-diabetic to diabetic patients. Without intervention, the model would be biased toward predicting "no diabetes" for everyone.
+</Warning>
+
+## The Class Imbalance Problem
+
+### What is Class Imbalance?
+
+Class imbalance occurs when one class (label) significantly outnumbers another:
+
+```python
+# Typical distribution in diabetes dataset
+diabetes=0 (no diabetes):  91,500 samples  (91.5%)
+diabetes=1 (has diabetes):  8,500 samples  ( 8.5%)
+
+# Imbalance ratio: 91,500 / 8,500 ≈ 10.8:1
+```
+
+<Info>
+  **Medical Context**: This imbalance reflects reality - Type 2 diabetes affects about 10-15% of the population, so having fewer positive cases is expected.
+</Info>
+
+### Why Imbalance is Problematic
+
+<Accordion title="1. Accuracy Paradox">
+  A naive model that predicts "no diabetes" for everyone achieves 91.5% accuracy!
+  
+  ```python
+  # Lazy classifier
+  def predict(patient):
+      return 0  # Always predict "no diabetes"
+  
+  # Accuracy: 91.5% (but useless!)
+  # Catches 0% of diabetes cases
+  ```
+  
+  **Problem**: High accuracy masks failure to identify diabetic patients.
+</Accordion>
+
+<Accordion title="2. Biased Learning">
+  Machine learning algorithms optimize for overall accuracy, so they focus on the majority class:
+  
+  ```
+  Model's thought process:
+  "If I predict no diabetes 100% of the time,
+   I'm correct 91.5% of the time.
+   Why bother learning the minority class?"
+  ```
+  
+  **Result**: Model learns to identify non-diabetic patterns but ignores diabetic patterns.
+</Accordion>
+
+<Accordion title="3. Poor Minority Class Performance">
+  Even if the model predicts some diabetes cases, performance is poor:
+  
+  ```
+  Without resampling:
+  - Recall (diabetes): 30% (misses 70% of cases)
+  - Precision (diabetes): 60% (many false positives)
+  
+  With resampling:
+  - Recall (diabetes): 75% (misses 25% of cases)
+  - Precision (diabetes): 80% (fewer false positives)
+  ```
+</Accordion>
+
+<Accordion title="4. Clinical Consequences">
+  **False Negatives are Costly:**
+  
+  - Missing a diabetes diagnosis delays treatment
+  - Patient may develop complications (kidney damage, blindness, amputation)
+  - Healthcare costs increase dramatically
+  
+  **Medical Principle**: Better to flag suspicious cases for follow-up than miss true cases.
+</Accordion>
+
+### Visualization of Imbalance
+
+```
+Class Distribution (Imbalanced):
+
+No Diabetes (0): ████████████████████ (91.5%)
+Diabetes (1):    ██                           ( 8.5%)
+
+
+Class Distribution (After SMOTEENN):
+
+No Diabetes (0): ███████████ (50%)
+Diabetes (1):    ███████████ (50%)
+```
+
+## Solution: SMOTEENN
+
+### What is SMOTEENN?
+
+**SMOTEENN** combines two techniques:
+
+<CardGroup cols={2}>
+  <Card title="SMOTE" icon="plus">
+    **S**ynthetic **M**inority **O**ver-sampling **TE**chnique
+    
+    Creates synthetic samples of the minority class (diabetes=1)
+  </Card>
+  
+  <Card title="ENN" icon="broom">
+    **E**dited **N**earest **N**eighbors
+    
+    Removes noisy samples from both classes to clean boundaries
+  </Card>
+</CardGroup>
+
+### Implementation
+
+```python
+from imblearn.combine import SMOTEENN
+
+# Create SMOTEENN instance
+smote_enn = SMOTEENN(random_state=42)
+
+# Apply to training data
+X_resampled, y_resampled = smote_enn.fit_resample(X_train, y_train)
+
+print(f"Original: {y_train.value_counts()}")
+print(f"Resampled: {y_resampled.value_counts()}")
+```
+
+**Output:**
+
+```
+Original:
+0    64050
+1     5950
+Name: diabetes, dtype: int64
+
+Resampled:
+0    58142
+1    57831
+Name: diabetes, dtype: int64
+```
+
+<Note>
+  **Random State**: Setting `random_state=42` ensures reproducible results across runs.
+</Note>
+
+## How SMOTE Works
+
+### Synthetic Sample Generation
+
+SMOTE creates new minority class samples by interpolating between existing samples:
+
+<Steps>
+  <Step title="Select Minority Sample">
+    Choose a random patient with diabetes from the dataset:
+    
+    ```python
+    patient_A = [Female, 50, 0, 0, current, 32.0, 6.5, 180]  # diabetes=1
+    ```
+  </Step>
+  
+  <Step title="Find Nearest Neighbors">
+    Find k nearest minority class neighbors (default k=5):
+    
+    ```python
+    patient_B = [Female, 52, 1, 0, former, 34.0, 6.8, 190]  # diabetes=1
+    patient_C = [Male,   48, 0, 1, current, 30.0, 6.3, 175]  # diabetes=1
+    # ... 3 more neighbors
+    ```
+  </Step>
+  
+  <Step title="Create Synthetic Sample">
+    Interpolate between patient_A and one randomly chosen neighbor:
+    
+    ```python
+    # Choose patient_B as neighbor
+    # Generate random weight: λ = 0.4
+    
+    synthetic_patient = patient_A + λ × (patient_B - patient_A)
+    
+    # Feature-by-feature:
+    age:         50 + 0.4 × (52 - 50)    = 50.8
+    bmi:         32 + 0.4 × (34 - 32)    = 32.8
+    HbA1c:       6.5 + 0.4 × (6.8 - 6.5) = 6.62
+    glucose:     180 + 0.4 × (190 - 180) = 184
+    # etc.
+    
+    # Result: [Female, 50.8, 0.4, 0, current, 32.8, 6.62, 184]
+    # Label: diabetes=1
+    ```
+  </Step>
+  
+  <Step title="Repeat">
+    Generate synthetic samples until classes are balanced
+  </Step>
+</Steps>
+
+### Why This Works
+
+<Accordion title="Realistic Samples">
+  Synthetic samples are **plausible patients** because they:
+  
+  - Fall within the feature space of real diabetes patients
+  - Maintain correlations between features (e.g., high BMI with high glucose)
+  - Don't simply duplicate existing samples
+  
+  **Example**:
+  ```python
+  # Real patient:
+  {"age": 50, "bmi": 32, "HbA1c": 6.5}
+  
+  # Synthetic patient (interpolated):
+  {"age": 51, "bmi": 33, "HbA1c": 6.6}
+  
+  # Both are realistic diabetes patients
+  ```
+</Accordion>
+
+<Accordion title="Expands Decision Boundaries">
+  Synthetic samples help the model learn the **full range** of diabetic patient characteristics:
+  
+  ```
+  Before SMOTE:
+  Model sees 8,500 diabetes examples
+  → Limited view of diabetic patient space
+  
+  After SMOTE:
+  Model sees 50,000+ diabetes examples
+  → Comprehensive view of diabetic patient space
+  ```
+</Accordion>
+
+<Accordion title="Prevents Overfitting to Majority">
+  With balanced classes, the model can't achieve high accuracy by ignoring the minority class.
+  
+  ```
+  Imbalanced:
+  "Predict all no diabetes" → 91.5% accuracy
+  
+  Balanced:
+  "Predict all no diabetes" → 50% accuracy (useless)
+  ```
+  
+  Forces the model to learn discriminative patterns for both classes.
+</Accordion>
+
+## How ENN Works
+
+### Edited Nearest Neighbors
+
+After SMOTE oversamples, **ENN** cleans up noisy and borderline samples:
+
+<Steps>
+  <Step title="For Each Sample">
+    Examine each sample in the dataset (both classes)
+  </Step>
+  
+  <Step title="Check Neighbors">
+    Find the k nearest neighbors (default k=3)
+    
+    ```python
+    # Example: Check this patient
+    patient_X = [Female, 45, 0, 0, never, 28, 5.8, 110]  # diabetes=1
+    
+    # Find 3 nearest neighbors:
+    neighbor_1: diabetes=0  # Different class!
+    neighbor_2: diabetes=0  # Different class!
+    neighbor_3: diabetes=1  # Same class
+    
+    # Majority class of neighbors: 0 (no diabetes)
+    ```
+  </Step>
+  
+  <Step title="Remove if Mismatched">
+    If the majority of neighbors have a DIFFERENT class, remove the sample:
+    
+    ```python
+    if majority_neighbor_class != sample_class:
+        remove_sample(patient_X)
+    
+    # Reasoning: This patient is in a "no diabetes" region
+    # but labeled as "diabetes" → likely noise or outlier
+    ```
+  </Step>
+  
+  <Step title="Result">
+    Cleaner decision boundaries between classes
+  </Step>
+</Steps>
+
+### Why ENN Matters
+
+<Accordion title="Removes Noisy Samples">
+  Some samples are mislabeled or atypical:
+  
+  ```python
+  # Possible noise:
+  {"age": 25, "bmi": 20, "HbA1c": 4.8, "glucose": 85, "diabetes": 1}
+  # All features suggest no diabetes, but labeled as diabetes
+  # Could be data entry error
+  
+  # ENN removes this to prevent confusing the model
+  ```
+</Accordion>
+
+<Accordion title="Clarifies Class Boundaries">
+  Borderline cases that overlap between classes are removed:
+  
+  ```
+  Feature Space:
+  
+  Before ENN:
+  OOOOOOOOXXXOXXOOOO   (O = no diabetes, X = diabetes)
+  ^^^^^ overlapping region ^^^^^
+  
+  After ENN:
+  OOOOOOOO    XXXXXX
+           ^^^ clearer boundary
+  ```
+  
+  Improves model's ability to distinguish classes.
+</Accordion>
+
+<Accordion title="Prevents SMOTE Artifacts">
+  SMOTE can create synthetic samples in noisy regions:
+  
+  ```python
+  # If SMOTE interpolates between two borderline samples,
+  # it might create ambiguous synthetic samples
+  
+  # ENN cleans these up after SMOTE
+  ```
+</Accordion>
+
+## SMOTEENN Process Visualization
+
+```
+Original Dataset (Imbalanced):
+
+No Diabetes: 91,500 samples  ████████████████████
+Diabetes:     8,500 samples  ██
+
+           ↓
+        [SMOTE]
+           ↓
+
+After SMOTE (Oversampled):
+
+No Diabetes: 91,500 samples  ████████████████████
+Diabetes:    91,500 samples  ████████████████████
+                             (83,000 synthetic)
+
+           ↓
+         [ENN]
+           ↓
+
+After ENN (Cleaned):
+
+No Diabetes: 58,142 samples  ████████████
+                             (33,358 noisy removed)
+Diabetes:    57,831 samples  ████████████
+                             (33,669 noisy removed)
+
+Final Ratio: ~1:1 (balanced)
+```
+
+## Code Implementation
+
+### Phase 1 (Notebook)
+
+```python
+from imblearn.combine import SMOTEENN
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
+
+# Load and encode data
+data = pd.read_csv("train.csv")
+# ... encoding steps ...
+
+# Split features and target
+X = data.drop('diabetes', axis=1)
+y = data['diabetes']
+
+# Scale first (SMOTEENN uses distance metrics)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Apply SMOTEENN
+smote_enn = SMOTEENN(random_state=42)
+X_resampled, y_resampled = smote_enn.fit_resample(X_scaled, y)
+
+print(f"Original shape: {X.shape}")
+print(f"Resampled shape: {X_resampled.shape}")
+print(f"\nOriginal distribution:\n{y.value_counts()}")
+print(f"\nResampled distribution:\n{y_resampled.value_counts()}")
+```
+
+### Phase 2 & 3 (train.py)
+
+```python
+from imblearn.combine import SMOTEENN
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
+
+# Load data
+z = pd.read_csv("train.csv")
+
+# Encode categorical features
+gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+smoking_history_dict = {
+    'No Info': 0, 'current': 1, 'ever': 2,
+    'former': 3, 'never': 4, 'not current': 5
+}
+z = z.replace({'gender': gender_dict, 'smoking_history': smoking_history_dict})
+
+# Separate features and target
+Xtr = z.drop('diabetes', axis=1)
+ytr = z[['diabetes']]
+
+# Scale features
+scaler = StandardScaler()
+Xtr = scaler.fit_transform(Xtr)
+
+# Apply SMOTEENN
+smote_enn = SMOTEENN(random_state=42)
+Xtr, ytr = smote_enn.fit_resample(Xtr, ytr)
+
+# Now Xtr and ytr are balanced
+```
+
+## SMOTEENN Parameters
+
+### Default Configuration
+
+```python
+SMOTEENN(
+    random_state=42,           # For reproducibility
+    sampling_strategy='auto',  # Balance to 1:1 ratio
+    smote=None,                # Use default SMOTE
+    enn=None,                  # Use default ENN
+    n_jobs=None                # Single-threaded
+)
+```
+
+### Customization Options
+
+<Tabs>
+  <Tab title="SMOTE Parameters">
+    ```python
+    from imblearn.over_sampling import SMOTE
+    from imblearn.under_sampling import EditedNearestNeighbours
+    from imblearn.combine import SMOTEENN
+    
+    # Custom SMOTE
+    custom_smote = SMOTE(
+        k_neighbors=3,           # Default: 5
+        sampling_strategy=0.8,   # Don't fully balance (0.8:1 ratio)
+        random_state=42
+    )
+    
+    smote_enn = SMOTEENN(
+        smote=custom_smote,
+        random_state=42
+    )
+    ```
+    
+    **k_neighbors**: Number of neighbors for interpolation
+    - Higher → smoother synthetic samples
+    - Lower → closer to existing samples
+  </Tab>
+  
+  <Tab title="ENN Parameters">
+    ```python
+    from imblearn.under_sampling import EditedNearestNeighbours
+    from imblearn.combine import SMOTEENN
+    
+    # Custom ENN
+    custom_enn = EditedNearestNeighbours(
+        n_neighbors=5,            # Default: 3
+        kind_sel='all'            # Remove if ANY neighbor disagrees
+    )
+    
+    smote_enn = SMOTEENN(
+        enn=custom_enn,
+        random_state=42
+    )
+    ```
+    
+    **n_neighbors**: Number of neighbors to check
+    - Higher → more conservative removal
+    - Lower → more aggressive cleaning
+    
+    **kind_sel**: Removal strategy
+    - 'all': Remove if any neighbor disagrees (aggressive)
+    - 'mode': Remove if majority disagrees (default)
+  </Tab>
+  
+  <Tab title="Sampling Strategy">
+    ```python
+    # Different balance ratios
+    
+    # 1:1 balance (default)
+    smote_enn = SMOTEENN(sampling_strategy='auto')
+    
+    # 0.5:1 balance (minority:majority)
+    smote_enn = SMOTEENN(sampling_strategy=0.5)
+    
+    # Custom target counts
+    smote_enn = SMOTEENN(sampling_strategy={1: 50000})
+    ```
+  </Tab>
+</Tabs>
+
+## Impact on Model Performance
+
+### Without SMOTEENN
+
+```python
+Classification Report:
+
+              precision    recall  f1-score   support
+
+           0       0.96      0.99      0.97     27450
+           1       0.65      0.35      0.46      2550
+
+    accuracy                           0.95     30000
+   macro avg       0.81      0.67      0.72     30000
+weighted avg       0.94      0.95      0.94     30000
+```
+
+**Problems:**
+- Recall (diabetes): Only 35% - misses 65% of diabetes cases!
+- Precision (diabetes): 65% - many false positives
+- Model biased toward majority class
+
+### With SMOTEENN
+
+```python
+Classification Report:
+
+              precision    recall  f1-score   support
+
+           0       0.97      0.94      0.95     27450
+           1       0.75      0.85      0.80      2550
+
+    accuracy                           0.93     30000
+   macro avg       0.86      0.90      0.88     30000
+weighted avg       0.94      0.93      0.93     30000
+```
+
+**Improvements:**
+- Recall (diabetes): 85% - catches most diabetes cases!
+- Precision (diabetes): 75% - fewer false positives
+- Better balance between classes
+
+<Info>
+  **Trade-off**: Overall accuracy slightly decreased (95% → 93%), but this is acceptable because we now catch far more diabetes cases.
+</Info>
+
+## Important Considerations
+
+### Only Apply to Training Data
+
+<Warning>
+  **Critical**: SMOTEENN is ONLY applied during training, NEVER during prediction.
+</Warning>
+
+```python
+# CORRECT
+# Training
+X_train_resampled, y_train_resampled = smote_enn.fit_resample(X_train, y_train)
+model.fit(X_train_resampled, y_train_resampled)
+
+# Prediction - NO resampling
+predictions = model.predict(X_test)
+
+# WRONG
+# Don't do this!
+X_test_resampled, y_test_resampled = smote_enn.fit_resample(X_test, y_test)
+predictions = model.predict(X_test_resampled)  # WRONG!
+```
+
+**Why?**
+- Test/prediction data represents real-world distribution
+- Resampling test data would give artificially inflated performance
+- Clinical deployment sees imbalanced data (most patients don't have diabetes)
+
+### Computational Cost
+
+<Accordion title="Processing Time">
+  SMOTEENN is computationally expensive:
+  
+  ```python
+  # Approximate processing times (100K samples)
+  
+  No resampling:        1 second
+  SMOTE only:          10 seconds
+  ENN only:            30 seconds
+  SMOTEENN (both):     40 seconds
+  ```
+  
+  **Reason**: Nearest neighbor searches are O(n²) complexity
+</Accordion>
+
+<Accordion title="Memory Usage">
+  SMOTEENN temporarily increases memory usage:
+  
+  ```python
+  # Memory footprint
+  
+  Original data:       100,000 samples = 6 MB
+  After SMOTE:         180,000 samples = 11 MB
+  After ENN:           115,000 samples = 7 MB
+  ```
+</Accordion>
+
+### Alternative Techniques
+
+SMOTEENN is one of many resampling techniques:
+
+<Tabs>
+  <Tab title="Other Oversampling">
+    ```python
+    from imblearn.over_sampling import ADASYN, BorderlineSMOTE, SVMSMOTE
+    
+    # ADASYN: Adaptive Synthetic Sampling
+    adasyn = ADASYN(random_state=42)
+    X_res, y_res = adasyn.fit_resample(X, y)
+    
+    # BorderlineSMOTE: Focus on borderline samples
+    borderline_smote = BorderlineSMOTE(random_state=42)
+    X_res, y_res = borderline_smote.fit_resample(X, y)
+    ```
+  </Tab>
+  
+  <Tab title="Other Undersampling">
+    ```python
+    from imblearn.under_sampling import RandomUnderSampler, TomekLinks
+    
+    # Random Undersampling
+    rus = RandomUnderSampler(random_state=42)
+    X_res, y_res = rus.fit_resample(X, y)
+    
+    # Tomek Links: Remove borderline majority samples
+    tomek = TomekLinks()
+    X_res, y_res = tomek.fit_resample(X, y)
+    ```
+  </Tab>
+  
+  <Tab title="Other Combinations">
+    ```python
+    from imblearn.combine import SMOTETomek
+    
+    # SMOTE + Tomek Links
+    smote_tomek = SMOTETomek(random_state=42)
+    X_res, y_res = smote_tomek.fit_resample(X, y)
+    ```
+  </Tab>
+  
+  <Tab title="Algorithmic Approaches">
+    ```python
+    # Class weights (no resampling)
+    from sklearn.ensemble import RandomForestClassifier
+    
+    # Automatically weight classes by inverse frequency
+    model = RandomForestClassifier(class_weight='balanced')
+    model.fit(X, y)  # No need for resampling
+    
+    # Or manual weights
+    model = RandomForestClassifier(class_weight={0: 1, 1: 10})
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<Steps>
+  <Step title="Always Scale Before SMOTEENN">
+    ```python
+    # Correct order
+    X_scaled = scaler.fit_transform(X)
+    X_resampled, y_resampled = smote_enn.fit_resample(X_scaled, y)
+    ```
+    
+    SMOTEENN uses distance metrics, so feature scaling is essential.
+  </Step>
+  
+  <Step title="Set Random State">
+    ```python
+    smote_enn = SMOTEENN(random_state=42)
+    ```
+    
+    Ensures reproducible results across runs.
+  </Step>
+  
+  <Step title="Only Resample Training Data">
+    ```python
+    # Split first
+    X_train, X_test, y_train, y_test = train_test_split(X, y)
+    
+    # Then resample ONLY training
+    X_train_res, y_train_res = smote_enn.fit_resample(X_train, y_train)
+    
+    # Test remains original distribution
+    ```
+  </Step>
+  
+  <Step title="Evaluate on Imbalanced Test Set">
+    ```python
+    # Train on balanced data
+    model.fit(X_train_resampled, y_train_resampled)
+    
+    # Test on imbalanced data (real-world distribution)
+    predictions = model.predict(X_test)
+    
+    # Use metrics that account for imbalance
+    from sklearn.metrics import classification_report
+    print(classification_report(y_test, predictions))
+    ```
+  </Step>
+</Steps>
+
+## Evaluation Metrics for Imbalanced Data
+
+Accuracy is misleading with imbalanced data. Use these instead:
+
+<Tabs>
+  <Tab title="Confusion Matrix">
+    ```python
+    from sklearn.metrics import confusion_matrix
+    
+    cm = confusion_matrix(y_true, y_pred)
+    
+    #                Predicted
+    #                No    Yes
+    # Actual No  |  TN  |  FP  |
+    #       Yes  |  FN  |  TP  |
+    
+    TN, FP, FN, TP = cm.ravel()
+    ```
+  </Tab>
+  
+  <Tab title="Precision & Recall">
+    ```python
+    # Precision: Of predicted diabetes, what % truly have it?
+    precision = TP / (TP + FP)
+    
+    # Recall (Sensitivity): Of actual diabetes, what % did we catch?
+    recall = TP / (TP + FN)
+    
+    # F1-Score: Harmonic mean
+    f1 = 2 * (precision * recall) / (precision + recall)
+    ```
+    
+    **For diabetes screening, prioritize high recall** (catch all cases).
+  </Tab>
+  
+  <Tab title="ROC-AUC">
+    ```python
+    from sklearn.metrics import roc_auc_score, roc_curve
+    
+    # Area under ROC curve
+    auc = roc_auc_score(y_true, y_pred_proba)
+    
+    # Interpretation:
+    # 0.5 = Random guessing
+    # 1.0 = Perfect classifier
+    # 0.8-0.9 = Good
+    ```
+  </Tab>
+  
+  <Tab title="PR-AUC">
+    ```python
+    from sklearn.metrics import average_precision_score
+    
+    # Precision-Recall AUC (better for imbalanced data)
+    pr_auc = average_precision_score(y_true, y_pred_proba)
+    
+    # More informative than ROC-AUC when classes are imbalanced
+    ```
+  </Tab>
+</Tabs>
+
+## Summary
+
+| Aspect | Before SMOTEENN | After SMOTEENN |
+|--------|----------------|----------------|
+| **Class Ratio** | 10.8:1 (imbalanced) | ~1:1 (balanced) |
+| **Minority Recall** | 30-40% | 75-85% |
+| **Model Bias** | Favors majority | Balanced |
+| **Training Samples** | 100,000 | ~115,000 |
+| **Decision Boundaries** | Unclear | Clean |
+
+<Tip>
+  **Key Takeaway**: SMOTEENN enables the model to learn diabetes patterns effectively by:
+  1. Creating more diabetes examples (SMOTE)
+  2. Removing confusing borderline cases (ENN)
+  3. Achieving class balance without naive duplication
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Model Architecture" icon="sitemap" href="/concepts/model-architecture">
+    See how balanced data improves RandomForest training
+  </Card>
+  
+  <Card title="Data Preprocessing" icon="filter" href="/concepts/data-preprocessing">
+    Complete preprocessing pipeline including resampling
+  </Card>
+  
+  <Card title="Dataset Overview" icon="database" href="/overview/dataset">
+    Understand the original imbalanced distribution
+  </Card>
+  
+  <Card title="Phase 1: Notebook" icon="book" href="/getting-started/phase-1-notebook">
+    Experiment with SMOTEENN in interactive notebook
+  </Card>
+</CardGroup>

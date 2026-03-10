@@ -1,0 +1,202 @@
+---
+title: API Overview
+description: Complete guide to the Diabetes Prediction API endpoints and authentication
+---
+
+## Introduction
+
+The Diabetes Prediction API is a FastAPI-based REST API that provides endpoints for training machine learning models and making diabetes predictions based on patient data.
+
+## Base URL
+
+```
+http://localhost
+```
+
+The API runs on port 80 by default.
+
+## Interactive Documentation
+
+FastAPI provides automatic interactive API documentation:
+
+- **Swagger UI**: [http://localhost/docs](http://localhost/docs)
+- **ReDoc**: [http://localhost/redoc](http://localhost/redoc)
+
+## Available Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/train` | Train the diabetes prediction model |
+| POST | `/predict` | Make a diabetes prediction for a patient |
+
+## Request Format
+
+All API requests should include the appropriate `Content-Type` header:
+
+```bash
+Content-Type: application/json
+```
+
+## Response Format
+
+All API responses are returned in JSON format:
+
+```json
+{
+  "message": "Response message"
+}
+```
+
+## Authentication
+
+The current version of the API does not require authentication. All endpoints are publicly accessible.
+
+<Warning>
+In a production environment, you should implement proper authentication and authorization mechanisms to secure your API endpoints.
+</Warning>
+
+## Error Handling
+
+The API uses standard HTTP status codes and returns error messages in JSON format:
+
+### Success Response (200 OK)
+
+```json
+{
+  "message": "Model successfully trained"
+}
+```
+
+### Error Response
+
+```json
+{
+  "message": "Something went wrong"
+}
+```
+
+### Validation Error (422 Unprocessable Entity)
+
+When the request body contains invalid data, FastAPI returns a detailed validation error:
+
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "age"],
+      "msg": "field required",
+      "type": "value_error.missing"
+    }
+  ]
+}
+```
+
+## Machine Learning Model
+
+The API uses a Random Forest Classifier with the following preprocessing steps:
+
+1. **Encoding**: Categorical variables (gender, smoking_history) are encoded to numerical values
+2. **Scaling**: Features are standardized using StandardScaler
+3. **Resampling**: SMOTEENN is applied during training to handle class imbalance
+
+### Model Artifacts
+
+- **Model File**: `model.pkl` (saved using pickle)
+- **Training Data**: `train.csv` (required for training)
+
+## Quick Start Example
+
+<CodeGroup>
+
+```bash cURL
+# 1. Train the model
+curl -X POST http://localhost/train
+
+# 2. Make a prediction
+curl -X POST http://localhost/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gender": "Female",
+    "age": 45,
+    "hypertension": 0,
+    "heart_disease": 0,
+    "smoking_history": "never",
+    "bmi": 27.5,
+    "HbA1c_level": 5.7,
+    "blood_glucose_level": 140
+  }'
+```
+
+```python Python
+import requests
+
+# 1. Train the model
+response = requests.post("http://localhost/train")
+print(response.json())
+
+# 2. Make a prediction
+patient_data = {
+    "gender": "Female",
+    "age": 45,
+    "hypertension": 0,
+    "heart_disease": 0,
+    "smoking_history": "never",
+    "bmi": 27.5,
+    "HbA1c_level": 5.7,
+    "blood_glucose_level": 140
+}
+
+response = requests.post("http://localhost/predict", json=patient_data)
+print(response.json())
+```
+
+```javascript JavaScript
+// 1. Train the model
+fetch('http://localhost/train', {
+  method: 'POST'
+})
+.then(response => response.json())
+.then(data => console.log(data));
+
+// 2. Make a prediction
+const patientData = {
+  gender: "Female",
+  age: 45,
+  hypertension: 0,
+  heart_disease: 0,
+  smoking_history: "never",
+  bmi: 27.5,
+  HbA1c_level: 5.7,
+  blood_glucose_level: 140
+};
+
+fetch('http://localhost/predict', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(patientData)
+})
+.then(response => response.json())
+.then(data => console.log(data));
+```
+
+</CodeGroup>
+
+## Rate Limiting
+
+The current version does not implement rate limiting. Consider implementing rate limiting in production environments to prevent abuse.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Train Endpoint" icon="brain" href="/api/train">
+    Learn how to train the diabetes prediction model
+  </Card>
+  <Card title="Predict Endpoint" icon="stethoscope" href="/api/predict">
+    Make predictions for patient data
+  </Card>
+  <Card title="Patient Model" icon="user" href="/api/patient-model">
+    Understand the Patient data schema
+  </Card>
+</CardGroup>

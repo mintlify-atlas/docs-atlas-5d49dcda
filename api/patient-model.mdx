@@ -1,0 +1,554 @@
+---
+title: Patient Model
+description: Complete reference for the Patient Pydantic model schema
+---
+
+## Overview
+
+The Patient model is a Pydantic BaseModel that defines the structure and validation rules for patient health data used in diabetes predictions.
+
+## Schema Definition
+
+The Patient model is defined in `patient.py` and contains 8 required fields representing key health metrics.
+
+```python
+from pydantic import BaseModel
+
+class Patient(BaseModel):
+    gender: str
+    age: int
+    hypertension: int
+    heart_disease: int
+    smoking_history: str
+    bmi: float
+    HbA1c_level: float
+    blood_glucose_level: int
+```
+
+## Fields
+
+### gender
+
+<ParamField path="gender" type="string" required>
+  Patient's gender
+  
+  **Allowed values**:
+  - `Female`
+  - `Male`
+  - `Other`
+  
+  **Example**: `"Female"`
+  
+  <Warning>Values are case-sensitive. Use exact capitalization as shown.</Warning>
+</ParamField>
+
+<Expandable title="Gender encoding">
+  Internally, gender values are encoded as:
+  - Female → 0
+  - Male → 1
+  - Other → 2
+  
+  This encoding is handled automatically by the API.
+</Expandable>
+
+---
+
+### age
+
+<ParamField path="age" type="integer" required>
+  Patient's age in years
+  
+  **Type**: Integer
+  
+  **Example**: `45`
+  
+  **Typical range**: 0-120
+  
+  **Clinical note**: Diabetes risk generally increases with age, particularly after age 45.
+</ParamField>
+
+---
+
+### hypertension
+
+<ParamField path="hypertension" type="integer" required>
+  Whether the patient has hypertension (high blood pressure)
+  
+  **Allowed values**:
+  - `0`: No hypertension
+  - `1`: Has hypertension
+  
+  **Example**: `0`
+  
+  **Clinical note**: Hypertension and diabetes often co-occur. People with hypertension are at higher risk for developing diabetes.
+</ParamField>
+
+---
+
+### heart_disease
+
+<ParamField path="heart_disease" type="integer" required>
+  Whether the patient has heart disease
+  
+  **Allowed values**:
+  - `0`: No heart disease
+  - `1`: Has heart disease
+  
+  **Example**: `0`
+  
+  **Clinical note**: Cardiovascular disease and diabetes share many risk factors. Having heart disease increases diabetes risk.
+</ParamField>
+
+---
+
+### smoking_history
+
+<ParamField path="smoking_history" type="string" required>
+  Patient's smoking history
+  
+  **Allowed values**:
+  - `never`: Never smoked
+  - `former`: Former smoker (quit smoking)
+  - `current`: Current smoker
+  - `not current`: Not currently smoking (may have smoked in the past)
+  - `ever`: Has smoked at some point
+  - `No Info`: No information available
+  
+  **Example**: `"never"`
+  
+  **Clinical note**: Smoking increases the risk of type 2 diabetes by 30-40%.
+</ParamField>
+
+<Expandable title="Smoking history encoding">
+  Internally, smoking history values are encoded as:
+  - No Info → 0
+  - current → 1
+  - ever → 2
+  - former → 3
+  - never → 4
+  - not current → 5
+  
+  This encoding is handled automatically by the API.
+</Expandable>
+
+---
+
+### bmi
+
+<ParamField path="bmi" type="float" required>
+  Body Mass Index (BMI) of the patient
+  
+  **Type**: Float
+  
+  **Example**: `27.5`
+  
+  **Calculation**: weight (kg) / height (m)²
+  
+  **BMI Categories**:
+  - Underweight: < 18.5
+  - Normal weight: 18.5 - 24.9
+  - Overweight: 25.0 - 29.9
+  - Obese: ≥ 30.0
+  
+  **Clinical note**: Higher BMI is strongly associated with increased risk of type 2 diabetes. A BMI of 30 or higher significantly increases risk.
+</ParamField>
+
+<Expandable title="BMI calculation examples">
+  **Example 1**: Person weighing 70 kg and 1.75 m tall
+  ```
+  BMI = 70 / (1.75)² = 22.86
+  ```
+  
+  **Example 2**: Person weighing 90 kg and 1.80 m tall
+  ```
+  BMI = 90 / (1.80)² = 27.78
+  ```
+</Expandable>
+
+---
+
+### HbA1c_level
+
+<ParamField path="HbA1c_level" type="float" required>
+  Hemoglobin A1c level - a measure of average blood glucose levels over the past 2-3 months
+  
+  **Type**: Float
+  
+  **Example**: `5.7`
+  
+  **Unit**: Percentage (%)
+  
+  **Reference ranges**:
+  - Normal: < 5.7%
+  - Prediabetes: 5.7% - 6.4%
+  - Diabetes: ≥ 6.5%
+  
+  **Clinical note**: HbA1c is one of the primary diagnostic criteria for diabetes. Values of 6.5% or higher on two separate tests indicate diabetes.
+</ParamField>
+
+<Expandable title="Understanding HbA1c">
+  **What is HbA1c?**
+  
+  Hemoglobin A1c (HbA1c) measures the percentage of hemoglobin proteins in your blood that have glucose attached to them. Because red blood cells live for about 3 months, HbA1c provides a long-term view of blood sugar control.
+  
+  **Why it matters**:
+  - More reliable than single blood glucose measurements
+  - Not affected by short-term fluctuations
+  - Used for both diagnosis and monitoring of diabetes
+  
+  **Approximate correlation to average blood glucose**:
+  - 5.0% ≈ 97 mg/dL
+  - 6.0% ≈ 126 mg/dL
+  - 7.0% ≈ 154 mg/dL
+  - 8.0% ≈ 183 mg/dL
+</Expandable>
+
+---
+
+### blood_glucose_level
+
+<ParamField path="blood_glucose_level" type="integer" required>
+  Blood glucose (sugar) level
+  
+  **Type**: Integer
+  
+  **Example**: `140`
+  
+  **Unit**: mg/dL (milligrams per deciliter)
+  
+  **Fasting glucose ranges**:
+  - Normal: 70-100 mg/dL
+  - Prediabetes: 100-125 mg/dL
+  - Diabetes: ≥ 126 mg/dL
+  
+  **Random glucose ranges**:
+  - Normal: < 140 mg/dL
+  - Prediabetes: 140-199 mg/dL
+  - Diabetes: ≥ 200 mg/dL
+  
+  **Clinical note**: Blood glucose levels vary throughout the day. Fasting glucose (8+ hours without food) is most commonly used for diagnosis.
+</ParamField>
+
+<Expandable title="Blood glucose testing types">
+  **Fasting Plasma Glucose (FPG)**:
+  - Measured after at least 8 hours of fasting
+  - Most common diagnostic test
+  - Normal: < 100 mg/dL
+  
+  **Random Plasma Glucose**:
+  - Measured at any time of day
+  - Useful for screening
+  - Normal: < 140 mg/dL
+  
+  **Oral Glucose Tolerance Test (OGTT)**:
+  - Measured 2 hours after drinking glucose solution
+  - More sensitive but less convenient
+  - Normal: < 140 mg/dL
+</Expandable>
+
+## Complete Example
+
+Here's a complete Patient object with realistic values:
+
+<CodeGroup>
+
+```json JSON
+{
+  "gender": "Female",
+  "age": 45,
+  "hypertension": 0,
+  "heart_disease": 0,
+  "smoking_history": "never",
+  "bmi": 27.5,
+  "HbA1c_level": 5.7,
+  "blood_glucose_level": 140
+}
+```
+
+```python Python (Dict)
+patient_data = {
+    "gender": "Female",
+    "age": 45,
+    "hypertension": 0,
+    "heart_disease": 0,
+    "smoking_history": "never",
+    "bmi": 27.5,
+    "HbA1c_level": 5.7,
+    "blood_glucose_level": 140
+}
+```
+
+```python Python (Pydantic Model)
+from patient import Patient
+
+patient = Patient(
+    gender="Female",
+    age=45,
+    hypertension=0,
+    heart_disease=0,
+    smoking_history="never",
+    bmi=27.5,
+    HbA1c_level=5.7,
+    blood_glucose_level=140
+)
+
+# Convert to dict
+patient_dict = patient.model_dump()
+
+# Convert to JSON string
+patient_json = patient.model_dump_json()
+```
+
+```javascript JavaScript
+const patientData = {
+  gender: "Female",
+  age: 45,
+  hypertension: 0,
+  heart_disease: 0,
+  smoking_history: "never",
+  bmi: 27.5,
+  HbA1c_level: 5.7,
+  blood_glucose_level: 140
+};
+```
+
+</CodeGroup>
+
+## Sample Patient Profiles
+
+### Low Risk Profile
+
+```json
+{
+  "gender": "Female",
+  "age": 28,
+  "hypertension": 0,
+  "heart_disease": 0,
+  "smoking_history": "never",
+  "bmi": 22.1,
+  "HbA1c_level": 5.0,
+  "blood_glucose_level": 85
+}
+```
+
+**Characteristics**: Young, healthy weight, no chronic conditions, never smoked, normal glucose levels.
+
+### Moderate Risk Profile
+
+```json
+{
+  "gender": "Male",
+  "age": 52,
+  "hypertension": 0,
+  "heart_disease": 0,
+  "smoking_history": "former",
+  "bmi": 28.7,
+  "HbA1c_level": 5.9,
+  "blood_glucose_level": 115
+}
+```
+
+**Characteristics**: Middle-aged, overweight, former smoker, prediabetic HbA1c range.
+
+### High Risk Profile
+
+```json
+{
+  "gender": "Male",
+  "age": 65,
+  "hypertension": 1,
+  "heart_disease": 1,
+  "smoking_history": "current",
+  "bmi": 34.2,
+  "HbA1c_level": 7.2,
+  "blood_glucose_level": 185
+}
+```
+
+**Characteristics**: Older age, obese, multiple chronic conditions, current smoker, diabetic-range glucose levels.
+
+## Validation
+
+Pydantic automatically validates all fields when creating a Patient object:
+
+### Type Validation
+
+```python
+# This will raise a validation error
+patient = Patient(
+    gender="Female",
+    age="forty-five",  # ❌ Should be int, not str
+    hypertension=0,
+    heart_disease=0,
+    smoking_history="never",
+    bmi=27.5,
+    HbA1c_level=5.7,
+    blood_glucose_level=140
+)
+```
+
+### Required Field Validation
+
+```python
+# This will raise a validation error
+patient = Patient(
+    gender="Female",
+    age=45,
+    # ❌ Missing required fields
+)
+```
+
+### API Validation Response
+
+When sending invalid data to the API, you'll receive a 422 error:
+
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "age"],
+      "msg": "value is not a valid integer",
+      "type": "type_error.integer"
+    }
+  ]
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use exact values for categorical fields">
+    For `gender` and `smoking_history`, use the exact string values specified (case-sensitive):
+    
+    ✅ Correct: `"Female"`
+    
+    ❌ Incorrect: `"female"`, `"FEMALE"`, `"F"`
+  </Accordion>
+  
+  <Accordion title="Ensure numeric fields have correct types">
+    - Use integers (no decimals) for: age, hypertension, heart_disease, blood_glucose_level
+    - Use floats (can have decimals) for: bmi, HbA1c_level
+    
+    ✅ Correct: `"age": 45`, `"bmi": 27.5`
+    
+    ❌ Incorrect: `"age": 45.0` (should be int), `"bmi": "27.5"` (should be number)
+  </Accordion>
+  
+  <Accordion title="Validate data before sending to API">
+    Implement client-side validation to catch errors before making API calls:
+    
+    ```python
+    from patient import Patient
+    from pydantic import ValidationError
+    
+    try:
+        patient = Patient(**patient_data)
+        # Data is valid, proceed with API call
+    except ValidationError as e:
+        # Handle validation errors
+        print(e.json())
+    ```
+  </Accordion>
+  
+  <Accordion title="Use realistic medical values">
+    Ensure values are within realistic medical ranges:
+    
+    - Age: 0-120 years
+    - BMI: 10-80 (typical range)
+    - HbA1c: 3.0-15.0% (typical range)
+    - Blood glucose: 20-600 mg/dL (typical range)
+  </Accordion>
+</AccordionGroup>
+
+## Common Validation Errors
+
+<ResponseField name="field required" type="validation_error">
+  One or more required fields are missing from the request.
+  
+  **Solution**: Include all 8 required fields in your request.
+</ResponseField>
+
+<ResponseField name="value is not a valid integer" type="validation_error">
+  A field that expects an integer received a different type.
+  
+  **Solution**: Ensure age, hypertension, heart_disease, and blood_glucose_level are integers.
+</ResponseField>
+
+<ResponseField name="value is not a valid float" type="validation_error">
+  A field that expects a float received a different type.
+  
+  **Solution**: Ensure bmi and HbA1c_level are numeric (can be int or float).
+</ResponseField>
+
+<ResponseField name="str type expected" type="validation_error">
+  A field that expects a string received a different type.
+  
+  **Solution**: Ensure gender and smoking_history are strings.
+</ResponseField>
+
+## Using the Patient Model
+
+### In Python Applications
+
+```python
+from patient import Patient
+import requests
+
+# Create a Patient object
+patient = Patient(
+    gender="Female",
+    age=45,
+    hypertension=0,
+    heart_disease=0,
+    smoking_history="never",
+    bmi=27.5,
+    HbA1c_level=5.7,
+    blood_glucose_level=140
+)
+
+# Send to API
+response = requests.post(
+    "http://localhost/predict",
+    json=patient.model_dump()
+)
+
+print(response.json())
+```
+
+### In Web Applications
+
+```javascript
+// Collect form data
+const formData = {
+  gender: document.getElementById('gender').value,
+  age: parseInt(document.getElementById('age').value),
+  hypertension: parseInt(document.getElementById('hypertension').value),
+  heart_disease: parseInt(document.getElementById('heart_disease').value),
+  smoking_history: document.getElementById('smoking_history').value,
+  bmi: parseFloat(document.getElementById('bmi').value),
+  HbA1c_level: parseFloat(document.getElementById('HbA1c_level').value),
+  blood_glucose_level: parseInt(document.getElementById('blood_glucose_level').value)
+};
+
+// Send to API
+fetch('http://localhost/predict', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(formData)
+})
+.then(response => response.json())
+.then(data => console.log(data));
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Make Predictions" icon="stethoscope" href="/api/predict">
+    Use the Patient model to make diabetes predictions
+  </Card>
+  <Card title="API Overview" icon="book" href="/api/overview">
+    Complete API documentation and examples
+  </Card>
+</CardGroup>

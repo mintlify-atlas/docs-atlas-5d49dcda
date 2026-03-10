@@ -1,0 +1,370 @@
+---
+title: 'Dataset'
+description: 'Comprehensive guide to the Diabetes Prediction Dataset structure and characteristics'
+---
+
+## Dataset Overview
+
+The Diabetes Prediction Dataset is a collection of medical and demographic data from patients, along with their diabetes status. This dataset is specifically designed for healthcare professionals to identify patients at risk of developing diabetes.
+
+<Info>
+  **Source**: [Kaggle - Diabetes Prediction Dataset](https://www.kaggle.com/datasets/iammustafatz/diabetes-prediction-dataset)
+  
+  **Size**: 100,000 patient records
+  
+  **Features**: 8 input features + 1 target variable
+</Info>
+
+## Dataset Structure
+
+The dataset contains **100,000 rows** and **9 columns** with a mix of categorical, numeric, and binary features:
+
+```python
+# Dataset shape
+(100000, 9)
+
+# Data types
+gender                 object   # Categorical
+age                   float64   # Numeric
+hypertension            int64   # Binary
+heart_disease           int64   # Binary  
+smoking_history        object   # Categorical
+bmi                   float64   # Numeric
+HbA1c_level           float64   # Numeric
+blood_glucose_level     int64   # Numeric
+diabetes                int64   # Target (Binary)
+```
+
+## Sample Data
+
+Here's what the raw data looks like:
+
+<CodeGroup>
+```python First 5 Rows
+   gender   age  hypertension  heart_disease smoking_history    bmi  HbA1c_level  blood_glucose_level  diabetes
+0  Female  80.0             0              1           never  25.19          6.6                  140         0
+1  Female  54.0             0              0         No Info  27.32          6.6                   80         0
+2    Male  28.0             0              0           never  27.32          5.7                  158         0
+3  Female  36.0             0              0         current  23.45          5.0                  155         0
+4    Male  76.0             1              1         current  20.14          4.8                  155         0
+```
+
+```python After Encoding
+   gender   age  hypertension  heart_disease  smoking_history    bmi  HbA1c_level  blood_glucose_level  diabetes
+0       0  80.0             0              1                4  25.19          6.6                  140         0
+1       0  54.0             0              0                0  27.32          6.6                   80         0
+2       1  28.0             0              0                4  27.32          5.7                  158         0
+3       0  36.0             0              0                1  23.45          5.0                  155         0
+4       1  76.0             1              1                1  20.14          4.8                  155         0
+```
+</CodeGroup>
+
+## Feature Descriptions
+
+<Accordion title="1. Gender (Categorical)">
+  Patient's biological gender.
+  
+  **Values**: 
+  - `Female` (encoded as 0)
+  - `Male` (encoded as 1)
+  - `Other` (encoded as 2)
+  
+  **Encoding Used**:
+  ```python
+  gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+  ```
+</Accordion>
+
+<Accordion title="2. Age (Numeric)">
+  Patient's age in years.
+  
+  **Type**: Float64
+  
+  **Range**: Varies from young adults to elderly patients
+  
+  **Example**: 28.0, 36.0, 54.0, 76.0, 80.0
+</Accordion>
+
+<Accordion title="3. Hypertension (Binary)">
+  Indicates whether the patient has hypertension (high blood pressure).
+  
+  **Values**:
+  - `0`: No hypertension
+  - `1`: Has hypertension
+  
+  **Significance**: Hypertension is a known risk factor for diabetes
+</Accordion>
+
+<Accordion title="4. Heart Disease (Binary)">
+  Indicates whether the patient has been diagnosed with heart disease.
+  
+  **Values**:
+  - `0`: No heart disease
+  - `1`: Has heart disease
+  
+  **Significance**: Cardiovascular conditions often correlate with metabolic disorders
+</Accordion>
+
+<Accordion title="5. Smoking History (Categorical)">
+  Patient's smoking status and history.
+  
+  **Values**: 
+  - `No Info` (encoded as 0) - No information available
+  - `current` (encoded as 1) - Currently smokes
+  - `ever` (encoded as 2) - Has smoked at some point
+  - `former` (encoded as 3) - Former smoker
+  - `never` (encoded as 4) - Never smoked
+  - `not current` (encoded as 5) - Not currently smoking
+  
+  **Encoding Used**:
+  ```python
+  smoking_history_dict = {
+      'No Info': 0, 
+      'current': 1, 
+      'ever': 2, 
+      'former': 3, 
+      'never': 4, 
+      'not current': 5
+  }
+  ```
+</Accordion>
+
+<Accordion title="6. BMI - Body Mass Index (Numeric)">
+  A measure of body fat based on height and weight.
+  
+  **Type**: Float64
+  
+  **Formula**: weight (kg) / height² (m²)
+  
+  **Example Values**: 20.14, 23.45, 25.19, 27.32, 32.27
+  
+  **Interpretation**:
+  - < 18.5: Underweight
+  - 18.5-24.9: Normal weight
+  - 25.0-29.9: Overweight
+  - ≥ 30.0: Obese
+</Accordion>
+
+<Accordion title="7. HbA1c Level (Numeric)">
+  Hemoglobin A1c level - a measure of average blood glucose over the past 2-3 months.
+  
+  **Type**: Float64
+  
+  **Unit**: Percentage (%)
+  
+  **Example Values**: 4.8, 5.0, 5.7, 6.2, 6.6
+  
+  **Clinical Significance**:
+  - < 5.7%: Normal
+  - 5.7-6.4%: Prediabetes
+  - ≥ 6.5%: Diabetes
+</Accordion>
+
+<Accordion title="8. Blood Glucose Level (Numeric)">
+  Current blood glucose (sugar) level measurement.
+  
+  **Type**: Int64
+  
+  **Unit**: mg/dL (milligrams per deciliter)
+  
+  **Example Values**: 80, 140, 155, 158, 220
+  
+  **Clinical Significance**:
+  - < 100 mg/dL: Normal (fasting)
+  - 100-125 mg/dL: Prediabetes (fasting)
+  - ≥ 126 mg/dL: Diabetes (fasting)
+</Accordion>
+
+<Accordion title="9. Diabetes (Target Variable)">
+  Whether the patient has been diagnosed with diabetes.
+  
+  **Type**: Binary (Int64)
+  
+  **Values**:
+  - `0`: No diabetes
+  - `1`: Has diabetes
+  
+  **Distribution**: The dataset is imbalanced with significantly more negative cases
+</Accordion>
+
+## Data Quality
+
+<Tabs>
+  <Tab title="Completeness">
+    The dataset has **no missing values** across all 100,000 records:
+    
+    ```python
+    # All columns have 100,000 non-null values
+    gender               100000 non-null
+    age                  100000 non-null
+    hypertension         100000 non-null
+    heart_disease        100000 non-null
+    smoking_history      100000 non-null
+    bmi                  100000 non-null
+    HbA1c_level          100000 non-null
+    blood_glucose_level  100000 non-null
+    diabetes             100000 non-null
+    ```
+  </Tab>
+  
+  <Tab title="Memory Usage">
+    The dataset is memory-efficient:
+    
+    ```python
+    # Total memory usage
+    memory usage: 6.9+ MB
+    ```
+  </Tab>
+</Tabs>
+
+## Class Imbalance
+
+The dataset exhibits significant **class imbalance** - a common challenge in medical datasets:
+
+<Warning>
+  The number of patients **without diabetes** (class 0) far exceeds those **with diabetes** (class 1). This imbalance can cause models to be biased toward predicting the majority class.
+</Warning>
+
+### Solution: SMOTEENN Resampling
+
+The project addresses this using **SMOTEENN** (SMOTE + Edited Nearest Neighbors):
+
+```python
+from imblearn.combine import SMOTEENN
+
+# Apply over and undersampling with SMOTEENN
+smote_enn = SMOTEENN(random_state=42)
+X_resampled, y_resampled = smote_enn.fit_resample(X_train, y_train)
+```
+
+This technique:
+1. **Oversamples** the minority class (diabetes=1) using SMOTE
+2. **Undersamples** by removing noisy samples using Edited Nearest Neighbors
+3. Results in a more balanced training set
+
+<Info>
+  For more details on how imbalanced data is handled, see [Imbalanced Data Handling](/concepts/imbalanced-data).
+</Info>
+
+## Data Preprocessing Pipeline
+
+<Steps>
+  <Step title="Categorical Encoding">
+    Convert gender and smoking_history to numeric codes:
+    
+    ```python
+    gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+    smoking_history_dict = {
+        'No Info': 0, 'current': 1, 'ever': 2, 
+        'former': 3, 'never': 4, 'not current': 5
+    }
+    data = data.replace({
+        'gender': gender_dict, 
+        'smoking_history': smoking_history_dict
+    })
+    ```
+  </Step>
+  
+  <Step title="Feature Scaling">
+    Normalize all features using StandardScaler:
+    
+    ```python
+    from sklearn.preprocessing import StandardScaler
+    
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    ```
+  </Step>
+  
+  <Step title="Resampling">
+    Balance the dataset using SMOTEENN:
+    
+    ```python
+    from imblearn.combine import SMOTEENN
+    
+    smote_enn = SMOTEENN(random_state=42)
+    X_balanced, y_balanced = smote_enn.fit_resample(X_scaled, y)
+    ```
+  </Step>
+</Steps>
+
+## Accessing the Dataset
+
+### Prerequisites
+
+You need Kaggle API credentials to download the dataset:
+
+<Steps>
+  <Step title="Create Kaggle Account">
+    Sign up at [kaggle.com](https://www.kaggle.com/) if you don't have an account
+  </Step>
+  
+  <Step title="Generate API Token">
+    1. Go to your Kaggle account settings
+    2. Scroll to "API" section
+    3. Click "Create New API Token"
+    4. This downloads `kaggle.json` with your credentials
+  </Step>
+  
+  <Step title="Use in Phase 1">
+    Upload `kaggle.json` to Google Colab when running the Phase 1 notebook
+  </Step>
+</Steps>
+
+### Download Commands
+
+<CodeGroup>
+```bash Google Colab (Phase 1)
+# Setup Kaggle credentials
+!mkdir -p ~/.kaggle
+!mv kaggle.json ~/.kaggle/
+
+# Download dataset
+!kaggle datasets download -d iammustafatz/diabetes-prediction-dataset
+!unzip -q diabetes-prediction-dataset.zip -d .
+```
+
+```bash Local Download
+# Install Kaggle CLI
+pip install kaggle
+
+# Place kaggle.json in ~/.kaggle/
+mkdir -p ~/.kaggle
+mv kaggle.json ~/.kaggle/
+chmod 600 ~/.kaggle/kaggle.json
+
+# Download dataset
+kaggle datasets download -d iammustafatz/diabetes-prediction-dataset
+unzip diabetes-prediction-dataset.zip
+```
+</CodeGroup>
+
+## Dataset Files
+
+After downloading and unzipping, you'll have:
+
+- `diabetes_prediction_dataset.csv` - The full dataset with 100,000 records
+
+For Phase 2 (CLI) and Phase 3 (API), you'll need to split this into:
+- `train.csv` - Training data (with diabetes column)
+- `test.csv` - Test data (optionally without diabetes column for predictions)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Patient Features" icon="stethoscope" href="/concepts/patient-features">
+    Detailed medical interpretation of each feature
+  </Card>
+  
+  <Card title="Data Preprocessing" icon="filter" href="/concepts/data-preprocessing">
+    Learn about the preprocessing pipeline
+  </Card>
+  
+  <Card title="Imbalanced Data" icon="scale-unbalanced" href="/concepts/imbalanced-data">
+    Understanding SMOTEENN resampling technique
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/getting-started/quickstart">
+    Start making predictions with the dataset
+  </Card>
+</CardGroup>

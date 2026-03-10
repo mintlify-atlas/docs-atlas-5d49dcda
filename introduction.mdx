@@ -1,0 +1,127 @@
+---
+title: Introduction
+description: A machine learning system for diabetes prediction using RandomForest with FastAPI deployment and Docker containerization
+---
+
+<div style={{
+  background: 'linear-gradient(135deg, #46bde6 0%, #80cee3 100%)',
+  padding: '4rem 2rem',
+  borderRadius: '8px',
+  marginBottom: '3rem',
+  textAlign: 'center'
+}}>
+  <h1 style={{
+    fontSize: '2.5rem',
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: '1rem'
+  }}>
+    Diabetes Prediction ML
+  </h1>
+  <p style={{
+    fontSize: '1.25rem',
+    color: '#ffffff',
+    maxWidth: '800px',
+    margin: '0 auto',
+    lineHeight: '1.6'
+  }}>
+    A comprehensive machine learning system for predicting diabetes using clinical and lifestyle data
+  </p>
+</div>
+
+## Overview
+
+Diabetes Prediction ML is a complete machine learning solution that predicts diabetes risk based on patient health metrics. Built with RandomForest classification and deployed as a FastAPI REST API, this system demonstrates the full ML lifecycle from exploratory analysis to production deployment.
+
+The project is structured in three progressive phases, each building on the previous one:
+
+<CardGroup cols={3}>
+  <Card title="Phase 1: Notebook" icon="book" href="/getting-started/phase-1-notebook">
+    Exploratory analysis and model development in Jupyter
+  </Card>
+  <Card title="Phase 2: CLI" icon="terminal" href="/getting-started/phase-2-cli">
+    Command-line tools for training and prediction
+  </Card>
+  <Card title="Phase 3: API" icon="server" href="/getting-started/phase-3-api">
+    REST API deployment with FastAPI and Docker
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="RandomForest Classifier" icon="tree">
+    Robust ensemble learning method for accurate diabetes prediction
+  </Card>
+  <Card title="SMOTEENN Balancing" icon="balance-scale">
+    Handles imbalanced datasets with combined over/under-sampling
+  </Card>
+  <Card title="FastAPI REST API" icon="bolt">
+    High-performance async API with automatic OpenAPI documentation
+  </Card>
+  <Card title="Docker Deployment" icon="docker">
+    Containerized application for consistent deployment environments
+  </Card>
+  <Card title="Feature Normalization" icon="chart-line">
+    StandardScaler preprocessing for optimal model performance
+  </Card>
+  <Card title="Batch & Single Predictions" icon="wand-magic-sparkles">
+    Support for both individual and batch prediction workflows
+  </Card>
+</CardGroup>
+
+## Quick Links
+
+<CardGroup cols={2}>
+  <Card title="Get Started" icon="rocket" href="/getting-started/quickstart">
+    Install and run your first prediction in minutes
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Explore the complete REST API documentation
+  </Card>
+  <Card title="Model Architecture" icon="brain" href="/concepts/model-architecture">
+    Understand how the prediction model works
+  </Card>
+  <Card title="Dataset Information" icon="database" href="/overview/dataset">
+    Learn about the training data from Kaggle
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+This diabetes prediction system is designed for:
+
+- **Healthcare Providers**: Screen patients for diabetes risk during routine checkups
+- **Research Teams**: Analyze factors contributing to diabetes in populations
+- **ML Engineers**: Reference implementation for healthcare ML workflows
+- **Students**: Learn end-to-end ML system development and deployment
+
+## Model Input
+
+The prediction model accepts eight patient features:
+
+- **Gender**: Patient's biological sex (Female, Male, Other)
+- **Age**: Patient's age in years
+- **Hypertension**: History of high blood pressure (0/1)
+- **Heart Disease**: History of heart disease (0/1)
+- **Smoking History**: Smoking status (never, current, former, etc.)
+- **BMI**: Body Mass Index (kg/m²)
+- **HbA1c Level**: Average blood glucose over 3 months (%)
+- **Blood Glucose Level**: Current blood glucose measurement (mg/dL)
+
+## What's Next?
+
+<Steps>
+  <Step title="Explore the Dataset">
+    Learn about the [diabetes prediction dataset](/overview/dataset) from Kaggle and its features
+  </Step>
+  <Step title="Run the Quickstart">
+    Get your [first prediction running](/getting-started/quickstart) in under 5 minutes
+  </Step>
+  <Step title="Understand the Model">
+    Deep dive into the [model architecture](/concepts/model-architecture) and preprocessing pipeline
+  </Step>
+  <Step title="Deploy to Production">
+    Follow the [deployment guide](/deployment/docker-setup) to containerize and deploy the API
+  </Step>
+</Steps>

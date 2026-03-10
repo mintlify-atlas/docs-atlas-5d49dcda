@@ -1,0 +1,707 @@
+---
+title: 'Data Preprocessing'
+description: 'Complete guide to the data preprocessing pipeline: encoding, scaling, and transformation'
+---
+
+## Overview
+
+Data preprocessing is a critical step that transforms raw patient data into a format suitable for machine learning. The diabetes prediction system applies a consistent preprocessing pipeline across all three phases.
+
+<Info>
+  **Pipeline Steps**: Categorical Encoding → Feature Scaling → Resampling (training only)
+  
+  **Goal**: Convert mixed-type patient data into normalized numeric features
+</Info>
+
+## Why Preprocessing Matters
+
+Machine learning models require numeric inputs with consistent scales. Without proper preprocessing:
+
+<CardGroup cols={2}>
+  <Card title="Categorical Issues" icon="xmark">
+    Models can't process strings like "Female" or "current smoker" directly
+  </Card>
+  
+  <Card title="Scale Sensitivity" icon="scale-unbalanced">
+    Features like blood_glucose (80-250) dominate smaller features like hypertension (0-1)
+  </Card>
+  
+  <Card title="Training Instability" icon="triangle-exclamation">
+    Unscaled features cause slow convergence and numerical instability
+  </Card>
+  
+  <Card title="Class Imbalance" icon="chart-pie">
+    Models biased toward majority class (no diabetes) without resampling
+  </Card>
+</CardGroup>
+
+## Complete Preprocessing Pipeline
+
+<Steps>
+  <Step title="Load Raw Data">
+    Start with CSV containing mixed data types:
+    
+    ```python
+    import pandas as pd
+    
+    data = pd.read_csv("train.csv")
+    print(data.dtypes)
+    ```
+    
+    **Output:**
+    ```
+    gender                 object   # String
+    age                   float64   # Numeric
+    hypertension            int64   # Binary
+    heart_disease           int64   # Binary
+    smoking_history        object   # String
+    bmi                   float64   # Numeric
+    HbA1c_level           float64   # Numeric
+    blood_glucose_level     int64   # Numeric
+    diabetes                int64   # Target
+    ```
+  </Step>
+  
+  <Step title="Encode Categorical Features">
+    Convert string categories to numeric codes:
+    
+    ```python
+    gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+    smoking_history_dict = {
+        'No Info': 0,
+        'current': 1,
+        'ever': 2,
+        'former': 3,
+        'never': 4,
+        'not current': 5
+    }
+    
+    data = data.replace({
+        'gender': gender_dict,
+        'smoking_history': smoking_history_dict
+    })
+    ```
+    
+    **Before:**
+    ```
+       gender   age  smoking_history    bmi  diabetes
+    0  Female  80.0            never  25.19         0
+    1    Male  54.0          current  27.32         0
+    ```
+    
+    **After:**
+    ```
+       gender   age  smoking_history    bmi  diabetes
+    0       0  80.0                4  25.19         0
+    1       1  54.0                1  27.32         0
+    ```
+  </Step>
+  
+  <Step title="Separate Features and Target">
+    Split data into input features (X) and target variable (y):
+    
+    ```python
+    X = data.drop('diabetes', axis=1)
+    y = data[['diabetes']]
+    
+    print(X.shape)  # (100000, 8)
+    print(y.shape)  # (100000, 1)
+    ```
+  </Step>
+  
+  <Step title="Scale Features">
+    Normalize all features using StandardScaler:
+    
+    ```python
+    from sklearn.preprocessing import StandardScaler
+    
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    ```
+    
+    **Before:**
+    ```
+       gender   age  hypertension  bmi   HbA1c  glucose
+    0       0  80.0             0  25.19   6.6      140
+    1       1  54.0             0  27.32   6.6       80
+    ```
+    
+    **After:**
+    ```
+       gender    age  hypertension   bmi  HbA1c  glucose
+    0  -0.58   1.85         -0.27  0.12   0.45     0.89
+    1   0.42   0.23         -0.27  0.34   0.45    -1.23
+    ```
+  </Step>
+  
+  <Step title="Resample for Balance (Training Only)">
+    Apply SMOTEENN to balance classes:
+    
+    ```python
+    from imblearn.combine import SMOTEENN
+    
+    smote_enn = SMOTEENN(random_state=42)
+    X_resampled, y_resampled = smote_enn.fit_resample(X_scaled, y)
+    
+    print(f"Original: {y.value_counts().to_dict()}")
+    print(f"Resampled: {y_resampled.value_counts().to_dict()}")
+    ```
+    
+    <Warning>
+      SMOTEENN is only applied during training. Prediction data is NOT resampled.
+    </Warning>
+  </Step>
+</Steps>
+
+## 1. Categorical Encoding
+
+### Gender Encoding
+
+**Mapping:**
+
+```python
+gender_dict = {
+    'Female': 0,
+    'Male': 1,
+    'Other': 2
+}
+```
+
+<Accordion title="Why These Values?">
+  The numeric values are arbitrary but consistent:
+  
+  - **0 (Female)**: Most common in dataset
+  - **1 (Male)**: Second most common
+  - **2 (Other)**: Least common
+  
+  The tree-based RandomForest doesn't assume ordinal relationship, so the specific values don't matter as long as they're consistent.
+</Accordion>
+
+**Implementation:**
+
+```python
+data['gender'] = data['gender'].replace(gender_dict)
+
+# Verify encoding
+print(data['gender'].unique())  # [0, 1, 2]
+```
+
+**Validation:**
+
+```python
+# Check for unmapped values
+if data['gender'].isna().any():
+    print("Warning: Some gender values not mapped!")
+```
+
+### Smoking History Encoding
+
+**Mapping:**
+
+```python
+smoking_history_dict = {
+    'No Info': 0,
+    'current': 1,
+    'ever': 2,
+    'former': 3,
+    'never': 4,
+    'not current': 5
+}
+```
+
+<Accordion title="Category Descriptions">
+  - **No Info (0)**: No smoking history available
+  - **current (1)**: Currently smokes
+  - **ever (2)**: Has smoked at some point
+  - **former (3)**: Former smoker (quit)
+  - **never (4)**: Never smoked
+  - **not current (5)**: Not currently smoking (may have smoked before)
+  
+  Note the overlap between categories - "former", "ever", and "not current" can be ambiguous.
+</Accordion>
+
+**Implementation:**
+
+```python
+data['smoking_history'] = data['smoking_history'].replace(smoking_history_dict)
+
+# Verify all categories mapped
+print(data['smoking_history'].value_counts())
+```
+
+### Alternative: One-Hot Encoding
+
+While the project uses label encoding, one-hot encoding is another option:
+
+<Tabs>
+  <Tab title="Label Encoding (Used)">
+    ```python
+    # Single column with numeric codes
+    smoking_history: [0, 1, 2, 3, 4, 5]
+    
+    # Pros:
+    # - Compact (1 column)
+    # - Works well with tree-based models
+    # - Simple implementation
+    
+    # Cons:
+    # - Implies ordinal relationship
+    # - Not ideal for linear models
+    ```
+  </Tab>
+  
+  <Tab title="One-Hot Encoding (Alternative)">
+    ```python
+    # Multiple binary columns
+    smoking_No_Info: [1, 0, 0, 0, 0, 0]
+    smoking_current: [0, 1, 0, 0, 0, 0]
+    smoking_ever:    [0, 0, 1, 0, 0, 0]
+    smoking_former:  [0, 0, 0, 1, 0, 0]
+    smoking_never:   [0, 0, 0, 0, 1, 0]
+    smoking_not_current: [0, 0, 0, 0, 0, 1]
+    
+    # Pros:
+    # - No ordinal assumption
+    # - Better for linear models
+    # - More interpretable
+    
+    # Cons:
+    # - More columns (6 instead of 1)
+    # - Sparse representation
+    
+    # Implementation:
+    data = pd.get_dummies(data, columns=['smoking_history'], prefix='smoking')
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  **For RandomForest**: Label encoding works fine because decision trees don't assume ordinal relationships.
+  
+  **For Linear/Logistic Regression**: One-hot encoding is preferred.
+</Tip>
+
+## 2. Feature Scaling
+
+### StandardScaler (Z-score Normalization)
+
+The project uses **StandardScaler** to normalize features:
+
+```python
+from sklearn.preprocessing import StandardScaler
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+```
+
+### How StandardScaler Works
+
+**Formula:**
+
+```
+X_scaled = (X - μ) / σ
+
+where:
+  μ = mean of feature
+  σ = standard deviation of feature
+```
+
+**Example with BMI:**
+
+```python
+# Original BMI values from training data
+bmi_values = [20.14, 23.45, 25.19, 27.32, 32.27, ...]
+
+# Calculate statistics
+mean_bmi = 27.5  # μ
+std_bmi = 5.2    # σ
+
+# Transform each value
+bmi_scaled = (bmi_values - mean_bmi) / std_bmi
+
+# Results:
+# 20.14 → (20.14 - 27.5) / 5.2 = -1.42
+# 23.45 → (23.45 - 27.5) / 5.2 = -0.78
+# 25.19 → (25.19 - 27.5) / 5.2 = -0.44
+# 27.32 → (27.32 - 27.5) / 5.2 = -0.03
+# 32.27 → (32.27 - 27.5) / 5.2 = +0.92
+```
+
+**Properties after scaling:**
+- Mean = 0
+- Standard deviation = 1
+- ~68% of values between -1 and +1
+- ~95% of values between -2 and +2
+
+### Feature-by-Feature Scaling
+
+<CodeGroup>
+```python Before Scaling
+# Feature ranges vary widely
+
+age:                  0.08 - 80.0    (range: ~80)
+hypertension:         0 - 1          (range: 1)
+heart_disease:        0 - 1          (range: 1)
+bmi:                  10.0 - 95.0    (range: ~85)
+HbA1c_level:          3.5 - 9.0      (range: ~5.5)
+blood_glucose_level:  80 - 300       (range: 220)
+
+# blood_glucose dominates due to large scale
+```
+
+```python After Scaling
+# All features on similar scale
+
+age:                  -2.5 to +2.5
+hypertension:         -0.3 to +3.3
+heart_disease:        -0.2 to +4.9
+bmi:                  -3.0 to +3.0
+HbA1c_level:          -2.0 to +2.0
+blood_glucose_level:  -2.0 to +2.0
+
+# All features contribute equally
+```
+</CodeGroup>
+
+### Why Scaling Matters for RandomForest
+
+<Note>
+  **Surprising Fact**: RandomForest is **scale-invariant** - it doesn't actually need feature scaling!
+  
+  Decision trees split on thresholds, so the scale doesn't matter:
+  - `if bmi > 27.5` works the same as `if bmi_scaled > 0.0`
+</Note>
+
+So why does the project scale features?
+
+1. **SMOTEENN requirement**: The resampling algorithm uses distance metrics that ARE scale-sensitive
+2. **Future model flexibility**: If you switch to a different model (SVM, Neural Network), scaling is already done
+3. **Consistency**: Same preprocessing for all phases
+
+### Fit vs Transform
+
+<Warning>
+  **Critical Distinction**: `fit_transform()` for training, `transform()` for prediction
+</Warning>
+
+<Tabs>
+  <Tab title="Training (fit_transform)">
+    ```python
+    # TRAINING: Learn statistics AND transform
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    
+    # Scaler learns:
+    # - Mean of each feature from training data
+    # - Std dev of each feature from training data
+    
+    # Then applies transformation using those statistics
+    ```
+  </Tab>
+  
+  <Tab title="Prediction (transform)">
+    ```python
+    # PREDICTION: Use training statistics
+    X_test_scaled = scaler.transform(X_test)
+    
+    # Scaler uses:
+    # - Mean from TRAINING data (not test data)
+    # - Std dev from TRAINING data (not test data)
+    
+    # This ensures consistent scaling
+    ```
+  </Tab>
+  
+  <Tab title="Common Mistake">
+    ```python
+    # WRONG: Don't do this!
+    scaler_test = StandardScaler()
+    X_test_scaled = scaler_test.fit_transform(X_test)
+    
+    # Problem:
+    # - Uses test data statistics
+    # - Different scale than training
+    # - Leads to poor predictions
+    # - Data leakage
+    ```
+  </Tab>
+</Tabs>
+
+### Current Implementation Issue
+
+<Warning>
+  **Problem in Phase 2 & 3**: The prediction scripts create a NEW scaler:
+  
+  ```python
+  # predict.py (INCORRECT)
+  scaler = StandardScaler()
+  Xts = scaler.fit_transform(Xts)  # Uses test data statistics!
+  ```
+  
+  This is incorrect and may reduce accuracy.
+</Warning>
+
+**Recommended Fix:**
+
+Save the scaler during training:
+
+```python
+# train.py
+import pickle
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Save scaler with model
+with open("model.pkl", "wb") as f:
+    pickle.dump({'model': m, 'scaler': scaler}, f)
+```
+
+Load the scaler during prediction:
+
+```python
+# predict.py
+import pickle
+
+# Load scaler and model
+with open("model.pkl", "rb") as f:
+    saved = pickle.load(f)
+    m = saved['model']
+    scaler = saved['scaler']
+
+# Use TRAINING scaler
+Xts = scaler.transform(Xts)  # Correct!
+```
+
+## 3. Class Resampling (Training Only)
+
+See [Imbalanced Data Handling](/concepts/imbalanced-data) for detailed information on SMOTEENN.
+
+Key points:
+- Only applied during training
+- Balances the minority class (diabetes=1)
+- Uses synthetic sample generation + noise removal
+- Not applied to prediction data
+
+## Preprocessing Code Comparison
+
+### Phase 1 (Notebook)
+
+```python
+# Encoding with LabelEncoder
+from sklearn.preprocessing import LabelEncoder
+
+le = LabelEncoder()
+data['gender'] = le.fit_transform(data['gender'])
+data['smoking_history'] = le.fit_transform(data['smoking_history'])
+
+# Split
+X = data.drop('diabetes', axis=1)
+y = data[['diabetes']]
+
+# Split train/test
+X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7)
+
+# Scale
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)  # Correct!
+
+# Resample
+smote_enn = SMOTEENN(random_state=42)
+X_resampled, y_resampled = smote_enn.fit_resample(X_train_scaled, y_train)
+```
+
+### Phase 2 & 3 (train.py)
+
+```python
+# Encoding with dictionaries
+gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+smoking_history_dict = {
+    'No Info': 0, 'current': 1, 'ever': 2,
+    'former': 3, 'never': 4, 'not current': 5
+}
+
+z = z.replace({'gender': gender_dict, 'smoking_history': smoking_history_dict})
+
+# Split
+Xtr = z.drop('diabetes', axis=1)
+ytr = z[['diabetes']]
+
+# Scale
+scaler = StandardScaler()
+Xtr = scaler.fit_transform(Xtr)
+
+# Resample
+smote_enn = SMOTEENN(random_state=42)
+Xtr, ytr = smote_enn.fit_resample(Xtr, ytr)
+```
+
+### Phase 2 & 3 (predict.py)
+
+```python
+# Load input
+Xts = pd.read_csv(input_file)
+
+# Encoding
+gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+smoking_history_dict = {
+    'No Info': 0, 'current': 1, 'ever': 2,
+    'former': 3, 'never': 4, 'not current': 5
+}
+
+Xts = Xts.replace({'gender': gender_dict, 'smoking_history': smoking_history_dict})
+
+# Scale
+scaler = StandardScaler()
+Xts = scaler.fit_transform(Xts)  # ISSUE: Should use training scaler!
+
+# NO resampling for predictions
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Always Use Same Encoding">
+    Use identical dictionaries for training and prediction:
+    
+    ```python
+    # Define once, use everywhere
+    GENDER_ENCODING = {'Female': 0, 'Male': 1, 'Other': 2}
+    SMOKING_ENCODING = {
+        'No Info': 0, 'current': 1, 'ever': 2,
+        'former': 3, 'never': 4, 'not current': 5
+    }
+    ```
+  </Step>
+  
+  <Step title="Save Scaler with Model">
+    ```python
+    # Save together
+    pickle.dump({'model': model, 'scaler': scaler}, file)
+    
+    # Load together
+    saved = pickle.load(file)
+    model = saved['model']
+    scaler = saved['scaler']
+    ```
+  </Step>
+  
+  <Step title="Validate Input Data">
+    ```python
+    # Check for unknown categories
+    valid_genders = {'Female', 'Male', 'Other'}
+    if not set(data['gender']).issubset(valid_genders):
+        raise ValueError(f"Invalid gender values: {set(data['gender']) - valid_genders}")
+    ```
+  </Step>
+  
+  <Step title="Handle Missing Values">
+    ```python
+    # Check for NaN after encoding
+    if data.isna().any().any():
+        print("Warning: Missing values detected!")
+        print(data.isna().sum())
+    ```
+  </Step>
+  
+  <Step title="Document Feature Order">
+    ```python
+    # Define expected feature order
+    FEATURE_COLUMNS = [
+        'gender', 'age', 'hypertension', 'heart_disease',
+        'smoking_history', 'bmi', 'HbA1c_level', 'blood_glucose_level'
+    ]
+    
+    # Ensure correct order
+    X = data[FEATURE_COLUMNS]
+    ```
+  </Step>
+</Steps>
+
+## Preprocessing Summary
+
+| Step | Input | Output | Purpose |
+|------|-------|--------|----------|
+| **Encoding** | Mixed types | All numeric | Enable model processing |
+| **Scaling** | Variable ranges | Standardized scale | Equal feature importance |
+| **Resampling** | Imbalanced classes | Balanced classes | Prevent bias |
+
+**Final Data Shape:**
+- Input: (N, 8) where N = number of samples
+- All features: float64
+- All scaled to ~mean=0, std=1
+- Training data: Balanced classes
+- Prediction data: Original distribution
+
+## Troubleshooting
+
+<Accordion title="ValueError: could not convert string to float">
+  **Cause**: Categorical features not encoded
+  
+  **Solution**: Apply encoding dictionaries before scaling
+  
+  ```python
+  # Check for string columns
+  print(data.dtypes)
+  
+  # Ensure encoding applied
+  data = data.replace({'gender': gender_dict, 'smoking_history': smoking_history_dict})
+  ```
+</Accordion>
+
+<Accordion title="Predictions worse than expected">
+  **Possible Cause**: Different scaling for training vs prediction
+  
+  **Solution**: Use the SAME scaler for both:
+  
+  ```python
+  # Save training scaler
+  pickle.dump(scaler, open('scaler.pkl', 'wb'))
+  
+  # Load in prediction
+  scaler = pickle.load(open('scaler.pkl', 'rb'))
+  X_scaled = scaler.transform(X)  # Not fit_transform!
+  ```
+</Accordion>
+
+<Accordion title="KeyError during encoding">
+  **Cause**: Input has category not in encoding dictionary
+  
+  **Example**: Gender = "Non-binary" but only have Female/Male/Other
+  
+  **Solution**: Add validation or handle unknown values:
+  
+  ```python
+  # Validation approach
+  valid_values = set(gender_dict.keys())
+  invalid = set(data['gender']) - valid_values
+  if invalid:
+      raise ValueError(f"Unknown gender values: {invalid}")
+  
+  # Or map unknown to "Other"
+  data['gender'] = data['gender'].apply(
+      lambda x: x if x in gender_dict else 'Other'
+  )
+  ```
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Imbalanced Data" icon="scale-unbalanced" href="/concepts/imbalanced-data">
+    Learn about SMOTEENN resampling technique
+  </Card>
+  
+  <Card title="Patient Features" icon="stethoscope" href="/concepts/patient-features">
+    Understand what each feature represents
+  </Card>
+  
+  <Card title="Model Architecture" icon="sitemap" href="/concepts/model-architecture">
+    See how preprocessed data is used in the model
+  </Card>
+  
+  <Card title="Phase 2: CLI" icon="terminal" href="/getting-started/phase-2-cli">
+    Apply preprocessing in CLI tools
+  </Card>
+</CardGroup>

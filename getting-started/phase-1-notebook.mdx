@@ -1,0 +1,529 @@
+---
+title: 'Phase 1: Jupyter Notebook'
+description: 'Interactive exploration and model development in Google Colab'
+---
+
+## Overview
+
+Phase 1 uses a Jupyter notebook (`Diabetes_Prediction.ipynb`) for interactive data exploration, visualization, model training, and evaluation. This phase is perfect for understanding the dataset, experimenting with different approaches, and developing the initial model.
+
+<Info>
+  **Best For**: Data scientists and ML engineers who want to explore the data, visualize patterns, and iterate on model development.
+  
+  **Platform**: Google Colab (free, no local setup required)
+</Info>
+
+## Prerequisites
+
+<Steps>
+  <Step title="Kaggle Account">
+    Create a free account at [kaggle.com](https://www.kaggle.com/)
+  </Step>
+  
+  <Step title="Kaggle API Credentials">
+    1. Go to your Kaggle account settings
+    2. Scroll to "API" section
+    3. Click "Create New API Token"
+    4. Download `kaggle.json` (you'll upload this to Colab)
+  </Step>
+  
+  <Step title="Google Colab Access">
+    Navigate to [Google Colab](https://colab.research.google.com/) - no installation needed
+  </Step>
+</Steps>
+
+## Getting Started
+
+<Steps>
+  <Step title="Open Notebook in Colab">
+    1. Go to Google Colab
+    2. Click **File → Upload notebook**
+    3. Navigate to `~/workspace/source/fase-1/Diabetes_Prediction.ipynb`
+    4. Upload the file
+    
+    Alternatively, if using Colab's GitHub integration:
+    ```
+    File → Open notebook → GitHub tab
+    ```
+  </Step>
+  
+  <Step title="Upload Kaggle Credentials">
+    When you run the first code cell, you'll need to upload your `kaggle.json` file:
+    
+    ```python
+    # This cell downloads data from Kaggle
+    !mkdir -p ~/.kaggle
+    !mv kaggle.json ~/.kaggle/
+    !kaggle datasets download -d iammustafatz/diabetes-prediction-dataset
+    !unzip -q diabetes-prediction-dataset.zip -d .
+    ```
+    
+    The notebook will prompt you to upload `kaggle.json`.
+  </Step>
+  
+  <Step title="Run All Cells">
+    Execute the notebook cells sequentially:
+    
+    ```
+    Runtime → Run all
+    ```
+    
+    Or use **Shift + Enter** to run cells one by one.
+  </Step>
+</Steps>
+
+## Notebook Structure
+
+The notebook is organized into logical sections:
+
+### 1. Overview
+
+<Accordion title="Dataset Introduction">
+  The notebook begins with a description of the dataset:
+  
+  > "The following data is a collection of medical and demographic data from patients, along with their diabetes status (positive or negative). This dataset includes 100,000 rows and 9 features:"
+  
+  **Features listed:**
+  1. gender
+  2. age
+  3. hypertension
+  4. heart_disease
+  5. smoking_history
+  6. body mass index (bmi)
+  7. HbA1c_level
+  8. blood_glucose_level
+  9. diabetes (target variable)
+  
+  > "Healthcare professionals may find this data useful in identifying patients at risk of developing diabetes and in developing personalized treatment plans."
+</Accordion>
+
+### 2. Data Download
+
+```python
+# Download data from Kaggle
+!mkdir -p ~/.kaggle
+!mv kaggle.json ~/.kaggle/
+!kaggle datasets download -d iammustafatz/diabetes-prediction-dataset
+!unzip -q diabetes-prediction-dataset.zip -d .
+```
+
+### 3. Import Libraries
+
+```python
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+from imblearn.combine import SMOTEENN
+```
+
+<Note>
+  The notebook uses:
+  - **pandas** for data manipulation
+  - **matplotlib/seaborn** for visualization
+  - **sklearn** for ML algorithms
+  - **imblearn** for handling imbalanced data
+</Note>
+
+### 4. Load and Explore Data
+
+<CodeGroup>
+```python Load Dataset
+# Load the data
+data = pd.read_csv("diabetes_prediction_dataset.csv")
+data = data[:100000]
+print(data.shape)  # (100000, 9)
+data.head()
+```
+
+```python Check Data Types
+# Verify data types and null values
+data.info()
+
+# Output:
+# RangeIndex: 100000 entries, 0 to 99999
+# Data columns (total 9 columns):
+#  #   Column               Non-Null Count   Dtype  
+# ---  ------               --------------   -----  
+#  0   gender               100000 non-null  object 
+#  1   age                  100000 non-null  float64
+#  2   hypertension         100000 non-null  int64  
+#  3   heart_disease        100000 non-null  int64  
+#  4   smoking_history      100000 non-null  object 
+#  5   bmi                  100000 non-null  float64
+#  6   HbA1c_level          100000 non-null  float64
+#  7   blood_glucose_level  100000 non-null  int64  
+#  8   diabetes             100000 non-null  int64
+```
+</CodeGroup>
+
+### 5. Visualize Class Distribution
+
+```python
+# Verify the distribution of classes
+sns.countplot(data=data, x='diabetes', palette=['skyblue', 'lightcoral'], hue='diabetes')
+plt.legend(['Sin diabetes', 'Con diabetes'])
+plt.title('Diabetes Distribution')
+plt.show()
+```
+
+<Warning>
+  This visualization reveals significant **class imbalance** - there are far more patients without diabetes than with diabetes. This is addressed later using SMOTEENN.
+</Warning>
+
+### 6. Encode Categorical Variables
+
+```python
+# Encode categorical variables (gender and smoking_history) as numeric
+le = LabelEncoder()
+data['gender'] = le.fit_transform(data['gender'])
+data['smoking_history'] = le.fit_transform(data['smoking_history'])
+
+# Verify encoding
+data.head()
+```
+
+<Tip>
+  While the notebook uses `LabelEncoder`, the production code (Phase 2 & 3) uses explicit dictionaries for more control:
+  
+  ```python
+  gender_dict = {'Female': 0, 'Male': 1, 'Other': 2}
+  smoking_history_dict = {'No Info': 0, 'current': 1, 'ever': 2, 'former': 3, 'never': 4, 'not current': 5}
+  ```
+</Tip>
+
+### 7. Split Features and Target
+
+```python
+# Divide data into features (X) and output (y)
+X = data.drop('diabetes', axis=1)
+y = data[['diabetes']]
+```
+
+### 8. Train-Test Split
+
+```python
+# Split 70% for training and validation, 30% for testing
+X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7)
+```
+
+<Info>
+  **Split Ratio**: 70% training, 30% testing
+  
+  **Stratification**: The notebook doesn't explicitly use stratification, but you could add `stratify=y` to ensure balanced splits.
+</Info>
+
+### 9. Feature Scaling
+
+```python
+# Scale the features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+```
+
+<Note>
+  **StandardScaler** normalizes features to have:
+  - Mean = 0
+  - Standard deviation = 1
+  
+  This is crucial for algorithms sensitive to feature scales.
+</Note>
+
+### 10. Handle Imbalanced Data
+
+```python
+# Apply oversampling and undersampling with SMOTEENN
+smote_enn = SMOTEENN(random_state=42)
+X_resampled, y_resampled = smote_enn.fit_resample(X_train, y_train)
+```
+
+<Accordion title="What is SMOTEENN?">
+  **SMOTEENN** combines two techniques:
+  
+  1. **SMOTE** (Synthetic Minority Over-sampling Technique):
+     - Creates synthetic samples of the minority class (diabetes=1)
+     - Interpolates between existing minority samples
+  
+  2. **ENN** (Edited Nearest Neighbors):
+     - Removes noisy samples from both classes
+     - Cleans up overlap between classes
+  
+  **Result**: A more balanced dataset with cleaner decision boundaries.
+  
+  See [Imbalanced Data Handling](/concepts/imbalanced-data) for more details.
+</Accordion>
+
+### 11. Train Model
+
+```python
+# Train the model
+model = RandomForestClassifier()
+model.fit(X_resampled, y_resampled)
+```
+
+<Accordion title="Why RandomForestClassifier?">
+  **RandomForest** is an ensemble learning method that:
+  
+  - Builds multiple decision trees
+  - Aggregates their predictions (voting)
+  - Handles non-linear relationships well
+  - Resistant to overfitting
+  - Works well out-of-the-box with default parameters
+  
+  **Default Parameters Used**:
+  - `n_estimators=100` (number of trees)
+  - `max_depth=None` (nodes expanded until pure)
+  - `min_samples_split=2`
+  - `random_state=None` (random)
+</Accordion>
+
+### 12. Make Predictions
+
+```python
+# Scale test data
+X_test_scaled = scaler.transform(X_test)
+
+# Make predictions
+y_pred = model.predict(X_test_scaled)
+```
+
+### 13. Evaluate Model
+
+```python
+# Generate classification report
+from sklearn.metrics import classification_report
+
+print(classification_report(y_test, y_pred))
+```
+
+This produces a detailed report with:
+- **Precision**: What % of positive predictions were correct?
+- **Recall**: What % of actual positives were found?
+- **F1-Score**: Harmonic mean of precision and recall
+- **Support**: Number of samples in each class
+
+## Key Concepts Demonstrated
+
+<CardGroup cols={2}>
+  <Card title="Data Exploration" icon="magnifying-glass">
+    Loading, inspecting, and visualizing the dataset to understand patterns and distributions
+  </Card>
+  
+  <Card title="Preprocessing" icon="filter">
+    Encoding categorical variables and scaling numeric features for model training
+  </Card>
+  
+  <Card title="Class Imbalance" icon="scale-unbalanced">
+    Using SMOTEENN to create a balanced training set from imbalanced medical data
+  </Card>
+  
+  <Card title="Model Training" icon="brain">
+    Training RandomForestClassifier and evaluating performance with classification metrics
+  </Card>
+</CardGroup>
+
+## Experimentation Ideas
+
+The notebook is perfect for trying different approaches:
+
+<Tabs>
+  <Tab title="Different Models">
+    Try other classifiers:
+    
+    ```python
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.svm import SVC
+    from sklearn.naive_bayes import GaussianNB
+    from sklearn.ensemble import GradientBoostingClassifier
+    
+    # Logistic Regression
+    model = LogisticRegression(max_iter=1000)
+    model.fit(X_resampled, y_resampled)
+    
+    # Support Vector Machine
+    model = SVC(kernel='rbf')
+    model.fit(X_resampled, y_resampled)
+    
+    # Gradient Boosting
+    model = GradientBoostingClassifier(n_estimators=100)
+    model.fit(X_resampled, y_resampled)
+    ```
+  </Tab>
+  
+  <Tab title="Hyperparameter Tuning">
+    Optimize RandomForest parameters:
+    
+    ```python
+    from sklearn.model_selection import GridSearchCV
+    
+    param_grid = {
+        'n_estimators': [50, 100, 200],
+        'max_depth': [10, 20, None],
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4]
+    }
+    
+    rf = RandomForestClassifier()
+    grid_search = GridSearchCV(rf, param_grid, cv=5, scoring='f1')
+    grid_search.fit(X_resampled, y_resampled)
+    
+    print(f"Best parameters: {grid_search.best_params_}")
+    ```
+  </Tab>
+  
+  <Tab title="Feature Importance">
+    Analyze which features matter most:
+    
+    ```python
+    # Train model
+    model = RandomForestClassifier()
+    model.fit(X_resampled, y_resampled)
+    
+    # Get feature importance
+    feature_names = ['gender', 'age', 'hypertension', 'heart_disease', 
+                     'smoking_history', 'bmi', 'HbA1c_level', 'blood_glucose_level']
+    importances = model.feature_importances_
+    
+    # Visualize
+    import pandas as pd
+    feature_imp = pd.DataFrame({'feature': feature_names, 'importance': importances})
+    feature_imp = feature_imp.sort_values('importance', ascending=False)
+    
+    sns.barplot(data=feature_imp, x='importance', y='feature')
+    plt.title('Feature Importance')
+    plt.show()
+    ```
+  </Tab>
+  
+  <Tab title="Different Resampling">
+    Try other techniques for imbalanced data:
+    
+    ```python
+    from imblearn.over_sampling import SMOTE, ADASYN
+    from imblearn.under_sampling import RandomUnderSampler
+    from imblearn.combine import SMOTETomek
+    
+    # SMOTE only
+    smote = SMOTE(random_state=42)
+    X_res, y_res = smote.fit_resample(X_train_scaled, y_train)
+    
+    # ADASYN (adaptive synthetic sampling)
+    adasyn = ADASYN(random_state=42)
+    X_res, y_res = adasyn.fit_resample(X_train_scaled, y_train)
+    
+    # SMOTETomek
+    smote_tomek = SMOTETomek(random_state=42)
+    X_res, y_res = smote_tomek.fit_resample(X_train_scaled, y_train)
+    ```
+  </Tab>
+</Tabs>
+
+## Sample Output
+
+When you run the notebook, you'll see:
+
+### Data Preview
+
+```
+   gender   age  hypertension  heart_disease smoking_history    bmi  HbA1c_level  blood_glucose_level  diabetes
+0  Female  80.0             0              1           never  25.19          6.6                  140         0
+1  Female  54.0             0              0         No Info  27.32          6.6                   80         0
+2    Male  28.0             0              0           never  27.32          5.7                  158         0
+3  Female  36.0             0              0         current  23.45          5.0                  155         0
+4    Male  76.0             1              1         current  20.14          4.8                  155         0
+```
+
+### Class Distribution Plot
+
+A bar chart showing the imbalance between diabetes=0 and diabetes=1 classes.
+
+### Classification Report
+
+```
+              precision    recall  f1-score   support
+
+           0       0.96      0.97      0.97     28500
+           1       0.85      0.82      0.83      1500
+
+    accuracy                           0.95     30000
+   macro avg       0.91      0.89      0.90     30000
+weighted avg       0.95      0.95      0.95     30000
+```
+
+<Note>
+  Actual numbers will vary based on the random train-test split.
+</Note>
+
+## Advantages of Phase 1
+
+<Accordion title="Interactive Exploration">
+  - Run code cells individually
+  - See immediate visual feedback
+  - Experiment without affecting production code
+  - Easy to share results with team
+</Accordion>
+
+<Accordion title="No Local Setup">
+  - Runs entirely in Google Colab
+  - No need to install Python or dependencies
+  - Free GPU/TPU access available
+  - Cloud storage integration
+</Accordion>
+
+<Accordion title="Documentation and Learning">
+  - Markdown cells explain each step
+  - Code and results in one place
+  - Perfect for presentations and reports
+  - Educational for understanding ML workflow
+</Accordion>
+
+## Limitations
+
+<Warning>
+  **Phase 1 is not suitable for:**
+  - Production deployments
+  - Automated pipelines
+  - Serving predictions to end users
+  - Batch processing large files
+  
+  For these use cases, proceed to [Phase 2 (CLI)](/getting-started/phase-2-cli) or [Phase 3 (API)](/getting-started/phase-3-api).
+</Warning>
+
+## Next Steps
+
+<Steps>
+  <Step title="Experiment">
+    Try different models, hyperparameters, and resampling techniques in the notebook
+  </Step>
+  
+  <Step title="Move to CLI">
+    Once satisfied with the model, proceed to [Phase 2](/getting-started/phase-2-cli) for command-line tools
+  </Step>
+  
+  <Step title="Deploy API">
+    For production use, implement [Phase 3](/getting-started/phase-3-api) REST API
+  </Step>
+</Steps>
+
+<CardGroup cols={2}>
+  <Card title="Phase 2: CLI" icon="terminal" href="/getting-started/phase-2-cli">
+    Command-line tools for batch predictions
+  </Card>
+  
+  <Card title="Phase 3: API" icon="cloud" href="/getting-started/phase-3-api">
+    REST API for production deployments
+  </Card>
+  
+  <Card title="Model Architecture" icon="sitemap" href="/concepts/model-architecture">
+    Deep dive into RandomForest and preprocessing
+  </Card>
+  
+  <Card title="Imbalanced Data" icon="scale-unbalanced" href="/concepts/imbalanced-data">
+    Understanding SMOTEENN technique
+  </Card>
+</CardGroup>

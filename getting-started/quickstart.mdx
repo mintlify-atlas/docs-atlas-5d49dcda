@@ -1,0 +1,367 @@
+---
+title: 'Quick Start'
+description: 'Get up and running with diabetes predictions in under 10 minutes'
+---
+
+## Welcome
+
+This guide will help you make your first diabetes prediction using the easiest deployment method - the **REST API (Phase 3)**. You'll have a working prediction endpoint in minutes.
+
+<Note>
+  **Time Required**: ~10 minutes
+  
+  **Prerequisites**: Docker installed on your system
+</Note>
+
+## Quick Start with REST API
+
+<Steps>
+  <Step title="Clone or Navigate to Source">
+    First, ensure you have the project source code:
+    
+    ```bash
+    cd ~/workspace/source/fase-3
+    ```
+  </Step>
+  
+  <Step title="Build Docker Image">
+    Build the FastAPI container:
+    
+    ```bash
+    docker build -t apirest .
+    ```
+    
+    This creates a Docker image with all dependencies installed:
+    - Python 3.12
+    - FastAPI 0.111.0
+    - scikit-learn 1.4.1
+    - imbalanced-learn 0.12.0
+    - All other required packages
+  </Step>
+  
+  <Step title="Run API Container">
+    Start the API server in detached mode:
+    
+    ```bash
+    docker run -d --name apirest-container -p 80:80 apirest
+    ```
+    
+    The API is now running and accessible at `http://localhost`
+  </Step>
+  
+  <Step title="Copy Training Data">
+    Copy your training dataset into the container:
+    
+    ```bash
+    # From the resources directory
+    docker cp train.csv apirest-container:/app
+    ```
+    
+    <Info>
+      Make sure you have `train.csv` from the Kaggle dataset. See [Dataset Documentation](/overview/dataset) for download instructions.
+    </Info>
+  </Step>
+  
+  <Step title="Access Swagger UI">
+    Open your browser and navigate to:
+    
+    ```
+    http://localhost/docs
+    ```
+    
+    You'll see the interactive Swagger API documentation with two endpoints:
+    - `POST /train` - Train the model
+    - `POST /predict` - Make predictions
+  </Step>
+  
+  <Step title="Train the Model">
+    In Swagger UI:
+    
+    1. Click on the **`POST /train`** endpoint
+    2. Click **"Try it out"**
+    3. Click **"Execute"**
+    
+    The API will:
+    - Load `train.csv`
+    - Encode categorical features
+    - Scale features with StandardScaler
+    - Apply SMOTEENN resampling
+    - Train RandomForestClassifier
+    - Save model to `model.pkl`
+    
+    **Response:**
+    ```json
+    {
+      "message": "Model successfully trained"
+    }
+    ```
+  </Step>
+  
+  <Step title="Make Your First Prediction">
+    Now predict diabetes for a sample patient:
+    
+    1. Click on the **`POST /predict`** endpoint
+    2. Click **"Try it out"**
+    3. Replace the request body with this patient data:
+    
+    ```json
+    {
+      "gender": "Female",
+      "age": 36,
+      "hypertension": 0,
+      "heart_disease": 0,
+      "smoking_history": "current",
+      "bmi": 32.27,
+      "HbA1c_level": 6.2,
+      "blood_glucose_level": 220
+    }
+    ```
+    
+    4. Click **"Execute"**
+    
+    **Response:**
+    ```json
+    {
+      "message": "Tiene diabetes"
+    }
+    ```
+    
+    <Tip>
+      Try different patient values to see how the prediction changes! Patients with higher HbA1c levels (≥6.5%) and blood glucose (≥126 mg/dL) are more likely to have diabetes.
+    </Tip>
+  </Step>
+</Steps>
+
+## Test with Different Patient Profiles
+
+<Tabs>
+  <Tab title="High Risk Patient">
+    ```json
+    {
+      "gender": "Female",
+      "age": 36,
+      "hypertension": 0,
+      "heart_disease": 0,
+      "smoking_history": "current",
+      "bmi": 32.27,
+      "HbA1c_level": 6.2,
+      "blood_glucose_level": 220
+    }
+    ```
+    
+    **Expected**: "Tiene diabetes" (Has diabetes)
+    
+    **Why**: High BMI (obese range), elevated HbA1c (prediabetic), very high blood glucose
+  </Tab>
+  
+  <Tab title="Low Risk Patient">
+    ```json
+    {
+      "gender": "Male",
+      "age": 28,
+      "hypertension": 0,
+      "heart_disease": 0,
+      "smoking_history": "never",
+      "bmi": 22.5,
+      "HbA1c_level": 5.0,
+      "blood_glucose_level": 90
+    }
+    ```
+    
+    **Expected**: "No tiene diabetes" (No diabetes)
+    
+    **Why**: Young, healthy BMI, normal HbA1c and glucose levels, no smoking
+  </Tab>
+  
+  <Tab title="Moderate Risk Patient">
+    ```json
+    {
+      "gender": "Female",
+      "age": 54,
+      "hypertension": 1,
+      "heart_disease": 0,
+      "smoking_history": "former",
+      "bmi": 27.32,
+      "HbA1c_level": 5.8,
+      "blood_glucose_level": 105
+    }
+    ```
+    
+    **Expected**: Variable (depends on model)
+    
+    **Why**: Overweight, hypertension present, prediabetic HbA1c range
+  </Tab>
+</Tabs>
+
+## Using cURL
+
+You can also interact with the API using command-line tools:
+
+<CodeGroup>
+```bash Train Model
+curl -X POST "http://localhost/train" \
+  -H "accept: application/json"
+```
+
+```bash Make Prediction
+curl -X POST "http://localhost/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gender": "Female",
+    "age": 36,
+    "hypertension": 0,
+    "heart_disease": 0,
+    "smoking_history": "current",
+    "bmi": 32.27,
+    "HbA1c_level": 6.2,
+    "blood_glucose_level": 220
+  }'
+```
+</CodeGroup>
+
+## Verify Container Status
+
+Check that your container is running properly:
+
+```bash
+# View running containers
+docker ps
+
+# Expected output:
+CONTAINER ID   IMAGE      COMMAND                  PORTS                NAMES
+abc123def456   apirest    "fastapi run apirest..."  0.0.0.0:80->80/tcp   apirest-container
+
+# View container logs
+docker logs apirest-container
+
+# Enter container shell (optional)
+docker exec -it apirest-container /bin/bash
+```
+
+## Stopping and Cleaning Up
+
+When you're done:
+
+```bash
+# Stop the container
+docker stop apirest-container
+
+# Remove the container
+docker rm apirest-container
+
+# (Optional) Remove the image
+docker rmi apirest
+```
+
+## Understanding the API Response
+
+The predict endpoint returns a simple JSON response:
+
+```json
+{
+  "message": "Tiene diabetes"  // or "No tiene diabetes"
+}
+```
+
+<Info>
+  The messages are in Spanish:
+  - **"Tiene diabetes"** = Has diabetes (prediction: 1)
+  - **"No tiene diabetes"** = No diabetes (prediction: 0)
+</Info>
+
+## Troubleshooting
+
+<Accordion title="Port 80 already in use">
+  If port 80 is occupied, use a different port:
+  
+  ```bash
+  docker run -d --name apirest-container -p 8080:80 apirest
+  ```
+  
+  Then access at `http://localhost:8080/docs`
+</Accordion>
+
+<Accordion title="Model file does not exist error">
+  This means the model hasn't been trained yet. Make sure to:
+  
+  1. Copy `train.csv` into the container
+  2. Call the `/train` endpoint before `/predict`
+  
+  ```bash
+  docker cp train.csv apirest-container:/app
+  ```
+</Accordion>
+
+<Accordion title="Something went wrong message">
+  Check the container logs for detailed error messages:
+  
+  ```bash
+  docker logs apirest-container
+  ```
+  
+  Common issues:
+  - Invalid patient data format
+  - Missing required fields
+  - Invalid categorical values (e.g., wrong gender or smoking_history)
+</Accordion>
+
+<Accordion title="Cannot download train.csv">
+  You need Kaggle credentials to download the dataset:
+  
+  1. Create a Kaggle account
+  2. Generate API token (kaggle.json)
+  3. Download dataset:
+  
+  ```bash
+  kaggle datasets download -d iammustafatz/diabetes-prediction-dataset
+  unzip diabetes-prediction-dataset.zip
+  ```
+  
+  See [Dataset Documentation](/overview/dataset) for detailed instructions.
+</Accordion>
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Phase 1: Notebook" icon="book" href="/getting-started/phase-1-notebook">
+    Explore the data and model in an interactive Jupyter notebook
+  </Card>
+  
+  <Card title="Phase 2: CLI" icon="terminal" href="/getting-started/phase-2-cli">
+    Use command-line tools for batch predictions
+  </Card>
+  
+  <Card title="API Deployment" icon="cloud" href="/deployment/api-deployment">
+    Advanced API deployment and integration guide
+  </Card>
+  
+  <Card title="Patient Features" icon="stethoscope" href="/concepts/patient-features">
+    Understand what each patient feature means
+  </Card>
+</CardGroup>
+
+## Alternative Start: CLI (Phase 2)
+
+If you prefer command-line tools over REST API:
+
+```bash
+# Navigate to fase-2
+cd ~/workspace/source/fase-2
+
+# Build and run container
+docker build -t ai-proyecto-sustituto .
+docker run -it --name ai-container ai-proyecto-sustituto /bin/bash
+
+# In another terminal, copy data files
+docker cp train.csv ai-container:/app
+docker cp test.csv ai-container:/app
+
+# Back in the container shell
+python train.py --model_file model.pkl --data_file train.csv --overwrite_model
+python predict.py --model_file model.pkl --input_file test.csv --predictions_file predictions.csv
+
+# View predictions
+cat predictions.csv
+```
+
+See [Phase 2: CLI Tools](/getting-started/phase-2-cli) for detailed documentation.

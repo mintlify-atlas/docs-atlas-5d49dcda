@@ -1,0 +1,834 @@
+---
+title: 'Docker Setup'
+description: 'Comprehensive guide to Docker containerization for diabetes prediction system'
+---
+
+## Overview
+
+Both Phase 2 (CLI) and Phase 3 (API) use Docker containers for consistent, reproducible deployments. This page covers Docker setup, configuration, and best practices for the diabetes prediction system.
+
+<Info>
+  **Docker Version**: The project uses standard Docker (Docker Engine 20.10+)
+  
+  **Base Image**: Python 3.12 official image
+</Info>
+
+## Why Docker?
+
+<CardGroup cols={2}>
+  <Card title="Consistency" icon="check">
+    Same environment on development, testing, and production machines
+  </Card>
+  
+  <Card title="Isolation" icon="box">
+    Dependencies don't conflict with other projects on the same machine
+  </Card>
+  
+  <Card title="Portability" icon="truck">
+    Run anywhere Docker is installed - Linux, Mac, Windows, cloud
+  </Card>
+  
+  <Card title="Reproducibility" icon="clone">
+    Dockerfile ensures anyone can build identical environment
+  </Card>
+</CardGroup>
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install Docker">
+    Install Docker Desktop (Mac/Windows) or Docker Engine (Linux):
+    
+    <Tabs>
+      <Tab title="Windows">
+        1. Download [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/)
+        2. Run installer
+        3. Enable WSL 2 backend when prompted
+        4. Restart computer
+        5. Verify:
+        ```powershell
+        docker --version
+        ```
+      </Tab>
+      
+      <Tab title="macOS">
+        1. Download [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/)
+        2. Drag to Applications folder
+        3. Launch Docker Desktop
+        4. Wait for Docker to start (whale icon in menu bar)
+        5. Verify:
+        ```bash
+        docker --version
+        ```
+      </Tab>
+      
+      <Tab title="Linux">
+        ```bash
+        # Ubuntu/Debian
+        sudo apt-get update
+        sudo apt-get install docker.io docker-compose
+        sudo systemctl start docker
+        sudo systemctl enable docker
+        
+        # Add user to docker group (avoid sudo)
+        sudo usermod -aG docker $USER
+        
+        # Verify
+        docker --version
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Verify Installation">
+    Test Docker with a simple container:
+    
+    ```bash
+    docker run hello-world
+    ```
+    
+    Expected output:
+    ```
+    Hello from Docker!
+    This message shows that your installation appears to be working correctly.
+    ```
+  </Step>
+</Steps>
+
+## Phase 2: CLI Docker Setup
+
+### Dockerfile Analysis
+
+```dockerfile
+# fase-2/Dockerfile
+
+# Select Python base image
+FROM python:3.12
+
+# Set working directory
+WORKDIR /app
+
+# Copy necessary files to application directory
+ADD train.py /app
+ADD predict.py /app
+ADD requirements.txt /app
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+```
+
+<Accordion title="Line-by-Line Explanation">
+  **FROM python:3.12**
+  - Base image: Official Python 3.12 from Docker Hub
+  - Includes Python, pip, and standard library
+  - Based on Debian Linux
+  
+  **WORKDIR /app**
+  - Sets `/app` as the working directory
+  - All subsequent commands run in `/app`
+  - Directory is created if it doesn't exist
+  
+  **ADD train.py /app**
+  - Copies `train.py` from build context to `/app/train.py`
+  - `ADD` can also extract archives (though not used here)
+  
+  **ADD predict.py /app**
+  - Copies `predict.py` to container
+  
+  **ADD requirements.txt /app**
+  - Copies dependencies list
+  
+  **RUN pip install --no-cache-dir -r requirements.txt**
+  - Installs Python packages
+  - `--no-cache-dir`: Reduces image size by not caching packages
+  - Packages: scikit-learn, pandas, imbalanced-learn, loguru, argparse
+</Accordion>
+
+### Dependencies (requirements.txt)
+
+```txt
+argparse
+scikit-learn
+loguru
+pandas
+imbalanced-learn
+```
+
+### Building the Image
+
+```bash
+# Navigate to fase-2 directory
+cd ~/workspace/source/fase-2
+
+# Build image with tag 'ai-proyecto-sustituto'
+docker build -t ai-proyecto-sustituto .
+```
+
+**Build Process:**
+
+```
+Step 1/5 : FROM python:3.12
+ ---> Pulling python:3.12
+Step 2/5 : WORKDIR /app
+ ---> Running in abc123def456
+Step 3/5 : ADD train.py /app
+ ---> 9f8e7d6c5b4a
+Step 4/5 : ADD predict.py /app
+ ---> 3a2b1c0d9e8f
+Step 5/5 : RUN pip install --no-cache-dir -r requirements.txt
+ ---> Running in def456ghi789
+Successfully built 7f6e5d4c3b2a
+Successfully tagged ai-proyecto-sustituto:latest
+```
+
+<Tip>
+  **Build Time**: First build takes 5-10 minutes (downloads base image and installs packages). Subsequent builds are faster due to layer caching.
+</Tip>
+
+### Running the Container
+
+<Tabs>
+  <Tab title="Interactive Mode">
+    ```bash
+    docker run -it --name ai-container ai-proyecto-sustituto /bin/bash
+    ```
+    
+    **Flags:**
+    - `-i`: Interactive (keep STDIN open)
+    - `-t`: Allocate pseudo-TTY (terminal)
+    - `--name ai-container`: Name the container
+    - `/bin/bash`: Command to run (bash shell)
+    
+    **Result**: Opens bash shell inside container
+    
+    ```bash
+    root@abc123def456:/app#
+    ```
+  </Tab>
+  
+  <Tab title="Detached Mode">
+    ```bash
+    docker run -d --name ai-container ai-proyecto-sustituto sleep infinity
+    ```
+    
+    **Flags:**
+    - `-d`: Detached (run in background)
+    - `sleep infinity`: Keep container running
+    
+    **Access later:**
+    ```bash
+    docker exec -it ai-container /bin/bash
+    ```
+  </Tab>
+  
+  <Tab title="One-off Command">
+    ```bash
+    docker run --rm ai-proyecto-sustituto python train.py --help
+    ```
+    
+    **Flags:**
+    - `--rm`: Remove container after command completes
+    
+    **Use for**: Quick commands without creating persistent containers
+  </Tab>
+</Tabs>
+
+## Phase 3: API Docker Setup
+
+### Dockerfile Analysis
+
+```dockerfile
+# fase-3/Dockerfile
+
+# Select Python base image
+FROM python:3.12
+
+# Set working directory
+WORKDIR /app
+
+# Copy necessary files to application directory
+ADD .. /app
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Run the application
+CMD ["fastapi", "run", "apirest.py", "--port", "80"]
+```
+
+<Accordion title="Key Differences from Phase 2">
+  **ADD .. /app**
+  - Copies parent directory (entire fase-3 folder)
+  - Less selective than Phase 2 (which copied specific files)
+  - Includes all Python files, requirements.txt, etc.
+  
+  **CMD ["fastapi", "run", "apirest.py", "--port", "80"]**
+  - Default command when container starts
+  - Launches FastAPI application on port 80
+  - Unlike Phase 2, container runs automatically (no need for `/bin/bash`)
+</Accordion>
+
+### Dependencies (requirements.txt)
+
+```txt
+fastapi==0.111.0
+scikit-learn==1.4.1.post1
+loguru==0.7.2
+pandas==2.2.1
+imbalanced-learn==0.12.0
+```
+
+<Note>
+  Phase 3 has versioned dependencies for production stability, unlike Phase 2 which uses latest versions.
+</Note>
+
+### Building the Image
+
+```bash
+cd ~/workspace/source/fase-3
+docker build -t apirest .
+```
+
+### Running the API Container
+
+```bash
+docker run -d --name apirest-container -p 80:80 apirest
+```
+
+**Flags:**
+- `-d`: Detached mode (background)
+- `--name apirest-container`: Container name
+- `-p 80:80`: Port mapping (host:container)
+- `apirest`: Image name
+
+**Port Mapping Explanation:**
+
+```
+-p 80:80
+   ↑   ↑
+   |   Container port (FastAPI listens on 80)
+   Host port (access at localhost:80)
+```
+
+<Tip>
+  Use different host port if 80 is occupied:
+  ```bash
+  docker run -d --name apirest-container -p 8080:80 apirest
+  # Access at localhost:8080
+  ```
+</Tip>
+
+## Data Management
+
+### Copying Files to Containers
+
+<CodeGroup>
+```bash Copy TO Container
+# Syntax: docker cp <source> <container>:<destination>
+
+# Copy training data
+docker cp train.csv ai-container:/app
+
+# Copy test data
+docker cp test.csv ai-container:/app
+
+# Copy from subdirectory
+docker cp ~/data/train.csv ai-container:/app/data/
+```
+
+```bash Copy FROM Container
+# Copy predictions out
+docker cp ai-container:/app/predictions.csv ./results/
+
+# Copy trained model out
+docker cp ai-container:/app/model.pkl ./models/
+
+# Copy entire directory
+docker cp ai-container:/app/output ./local_output/
+```
+</CodeGroup>
+
+### Volume Mounting
+
+For persistent data storage and easier file access:
+
+<Tabs>
+  <Tab title="Phase 2 with Volumes">
+    ```bash
+    docker run -it \
+      --name ai-container \
+      -v $(pwd)/data:/app/data \
+      -v $(pwd)/models:/app/models \
+      ai-proyecto-sustituto /bin/bash
+    ```
+    
+    **Inside container:**
+    ```bash
+    python train.py --data_file /app/data/train.csv --model_file /app/models/model.pkl
+    ```
+    
+    **Result**: Files persist on host even after container is removed
+  </Tab>
+  
+  <Tab title="Phase 3 with Volumes">
+    ```bash
+    docker run -d \
+      --name apirest-container \
+      -p 80:80 \
+      -v $(pwd)/data:/app/data \
+      -v $(pwd)/models:/app/models \
+      apirest
+    ```
+    
+    **Benefit**: Models and data persist across container restarts
+  </Tab>
+</Tabs>
+
+<Warning>
+  **Windows Users**: Use absolute paths:
+  ```powershell
+  docker run -v C:\Users\YourName\data:/app/data ...
+  ```
+</Warning>
+
+## Container Management
+
+### Essential Commands
+
+<Tabs>
+  <Tab title="Lifecycle">
+    ```bash
+    # Start stopped container
+    docker start ai-container
+    
+    # Stop running container
+    docker stop ai-container
+    
+    # Restart container
+    docker restart ai-container
+    
+    # Remove container
+    docker rm ai-container
+    
+    # Force remove running container
+    docker rm -f ai-container
+    ```
+  </Tab>
+  
+  <Tab title="Inspection">
+    ```bash
+    # List running containers
+    docker ps
+    
+    # List all containers (including stopped)
+    docker ps -a
+    
+    # Container details
+    docker inspect ai-container
+    
+    # Resource usage
+    docker stats ai-container
+    
+    # Port mappings
+    docker port apirest-container
+    ```
+  </Tab>
+  
+  <Tab title="Logs">
+    ```bash
+    # View logs
+    docker logs ai-container
+    
+    # Follow logs (real-time)
+    docker logs -f apirest-container
+    
+    # Last 100 lines
+    docker logs --tail 100 ai-container
+    
+    # With timestamps
+    docker logs -t ai-container
+    ```
+  </Tab>
+  
+  <Tab title="Execution">
+    ```bash
+    # Execute command in running container
+    docker exec ai-container python --version
+    
+    # Interactive shell
+    docker exec -it ai-container /bin/bash
+    
+    # As specific user
+    docker exec -u root ai-container apt-get update
+    ```
+  </Tab>
+</Tabs>
+
+### Image Management
+
+```bash
+# List images
+docker images
+
+# Remove image
+docker rmi apirest
+
+# Remove unused images
+docker image prune
+
+# Remove all unused images
+docker image prune -a
+
+# Image details
+docker history apirest
+
+# Image size
+docker images apirest --format "{{.Size}}"
+```
+
+## Advanced Docker Configurations
+
+### Environment Variables
+
+```bash
+# Pass environment variables
+docker run -d \
+  -e MODEL_FILE=/app/models/model.pkl \
+  -e DATA_FILE=/app/data/train.csv \
+  -e LOG_LEVEL=DEBUG \
+  apirest
+```
+
+**In Python code:**
+
+```python
+import os
+
+model_file = os.getenv('MODEL_FILE', 'model.pkl')
+data_file = os.getenv('DATA_FILE', 'train.csv')
+log_level = os.getenv('LOG_LEVEL', 'INFO')
+```
+
+### Resource Limits
+
+```bash
+# Limit memory
+docker run -d \
+  --memory="2g" \
+  --memory-swap="2g" \
+  apirest
+
+# Limit CPU
+docker run -d \
+  --cpus="1.5" \
+  apirest
+
+# Combined
+docker run -d \
+  --memory="2g" \
+  --cpus="2" \
+  --name apirest-container \
+  -p 80:80 \
+  apirest
+```
+
+### Health Checks
+
+Add to Dockerfile:
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:80/health || exit 1
+```
+
+Or in docker run:
+
+```bash
+docker run -d \
+  --health-cmd="curl -f http://localhost:80/health || exit 1" \
+  --health-interval=30s \
+  --health-timeout=3s \
+  --health-retries=3 \
+  apirest
+```
+
+### Multi-stage Builds
+
+Optimize image size:
+
+```dockerfile
+# Build stage
+FROM python:3.12 AS builder
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Runtime stage
+FROM python:3.12-slim
+WORKDIR /app
+COPY --from=builder /root/.local /root/.local
+COPY . .
+ENV PATH=/root/.local/bin:$PATH
+CMD ["fastapi", "run", "apirest.py", "--port", "80"]
+```
+
+**Benefits:**
+- Smaller final image (uses slim base)
+- Faster pulls and deployments
+- Reduced attack surface
+
+## Docker Compose (Optional)
+
+For more complex setups:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  api:
+    build: ./fase-3
+    container_name: diabetes-api
+    ports:
+      - "80:80"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - MODEL_FILE=/app/models/model.pkl
+      - DATA_FILE=/app/data/train.csv
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+```
+
+**Usage:**
+
+```bash
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Rebuild and start
+docker-compose up -d --build
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use Specific Base Image Versions">
+    ```dockerfile
+    # Good
+    FROM python:3.12.1
+    
+    # Avoid
+    FROM python:latest
+    ```
+    
+    Ensures reproducibility across builds.
+  </Step>
+  
+  <Step title="Minimize Layers">
+    ```dockerfile
+    # Good - One RUN layer
+    RUN apt-get update && apt-get install -y \
+        package1 \
+        package2 \
+     && rm -rf /var/lib/apt/lists/*
+    
+    # Avoid - Multiple RUN layers
+    RUN apt-get update
+    RUN apt-get install -y package1
+    RUN apt-get install -y package2
+    ```
+  </Step>
+  
+  <Step title="Use .dockerignore">
+    ```
+    # .dockerignore
+    __pycache__
+    *.pyc
+    .git
+    .env
+    venv/
+    *.pkl
+    *.csv
+    ```
+    
+    Prevents unnecessary files from being copied into the image.
+  </Step>
+  
+  <Step title="Don't Run as Root">
+    ```dockerfile
+    FROM python:3.12
+    
+    # Create non-root user
+    RUN useradd -m -u 1000 appuser
+    USER appuser
+    
+    WORKDIR /home/appuser/app
+    COPY --chown=appuser:appuser . .
+    
+    RUN pip install --user -r requirements.txt
+    ```
+  </Step>
+  
+  <Step title="Use ENV for Configuration">
+    ```dockerfile
+    ENV MODEL_FILE=model.pkl \
+        DATA_FILE=train.csv \
+        LOG_LEVEL=INFO
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="Port already allocated">
+  **Error**: `Bind for 0.0.0.0:80 failed: port is already allocated`
+  
+  **Solutions:**
+  
+  1. Use different port:
+  ```bash
+  docker run -p 8080:80 apirest
+  ```
+  
+  2. Stop conflicting container:
+  ```bash
+  docker ps | grep :80
+  docker stop <container_id>
+  ```
+  
+  3. Kill process using port:
+  ```bash
+  # Linux/Mac
+  sudo lsof -i :80
+  sudo kill <PID>
+  
+  # Windows
+  netstat -ano | findstr :80
+  taskkill /PID <PID> /F
+  ```
+</Accordion>
+
+<Accordion title="Container exits immediately">
+  **Problem**: Container stops right after starting
+  
+  **Diagnosis:**
+  ```bash
+  docker logs <container>
+  ```
+  
+  **Common Causes:**
+  - No CMD in Dockerfile (Phase 2)
+  - Application crashes on startup
+  - Missing dependencies
+  
+  **Solutions:**
+  
+  For Phase 2:
+  ```bash
+  docker run -it ai-proyecto-sustituto /bin/bash
+  ```
+  
+  For Phase 3:
+  ```bash
+  docker logs apirest-container
+  # Check for Python errors
+  ```
+</Accordion>
+
+<Accordion title="Cannot connect to Docker daemon">
+  **Error**: `Cannot connect to the Docker daemon`
+  
+  **Solutions:**
+  
+  - **Windows/Mac**: Start Docker Desktop
+  - **Linux**: Start Docker service:
+  ```bash
+  sudo systemctl start docker
+  ```
+  
+  - **Permissions** (Linux):
+  ```bash
+  sudo usermod -aG docker $USER
+  # Log out and back in
+  ```
+</Accordion>
+
+<Accordion title="Build fails - no space left">
+  **Error**: `no space left on device`
+  
+  **Solution**: Clean up Docker resources:
+  
+  ```bash
+  # Remove unused containers
+  docker container prune
+  
+  # Remove unused images
+  docker image prune -a
+  
+  # Remove unused volumes
+  docker volume prune
+  
+  # Nuclear option - remove everything
+  docker system prune -a --volumes
+  ```
+</Accordion>
+
+## Security Considerations
+
+<Warning>
+  **Important Security Practices:**
+</Warning>
+
+1. **Don't include sensitive data in images:**
+   ```dockerfile
+   # DON'T do this
+   COPY kaggle.json /app/
+   ```
+
+2. **Use secrets for credentials:**
+   ```bash
+   docker run -e KAGGLE_KEY=$(cat kaggle_key.txt) ...
+   ```
+
+3. **Scan images for vulnerabilities:**
+   ```bash
+   docker scan apirest
+   ```
+
+4. **Keep base images updated:**
+   ```bash
+   docker pull python:3.12
+   docker build -t apirest .
+   ```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CLI Usage" icon="terminal" href="/deployment/cli-usage">
+    Detailed CLI operations and automation
+  </Card>
+  
+  <Card title="API Deployment" icon="cloud" href="/deployment/api-deployment">
+    Production API deployment strategies
+  </Card>
+  
+  <Card title="Phase 2: CLI" icon="code" href="/getting-started/phase-2-cli">
+    CLI tools walkthrough
+  </Card>
+  
+  <Card title="Phase 3: API" icon="server" href="/getting-started/phase-3-api">
+    REST API implementation guide
+  </Card>
+</CardGroup>

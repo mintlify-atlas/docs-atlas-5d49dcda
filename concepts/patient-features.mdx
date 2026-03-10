@@ -1,0 +1,912 @@
+---
+title: 'Patient Features'
+description: 'Medical interpretation and significance of each patient feature used in diabetes prediction'
+---
+
+## Overview
+
+The diabetes prediction model analyzes **8 patient characteristics** to assess diabetes risk. This page provides detailed medical context for each feature, helping healthcare professionals understand what the model considers when making predictions.
+
+<Info>
+  **Total Features**: 8 (2 categorical, 6 numeric)
+  
+  **Clinical Basis**: All features are established diabetes risk factors in medical literature
+</Info>
+
+## Feature Summary Table
+
+| Feature | Type | Clinical Significance | Normal Range | High Risk |
+|---------|------|----------------------|--------------|----------|
+| Gender | Categorical | Metabolic differences | N/A | Male (slightly) |
+| Age | Numeric | Risk increases with age | N/A | >45 years |
+| Hypertension | Binary | Insulin resistance marker | 0 (no) | 1 (yes) |
+| Heart Disease | Binary | Metabolic syndrome indicator | 0 (no) | 1 (yes) |
+| Smoking History | Categorical | Inflammatory effects | never | current |
+| BMI | Numeric | Obesity indicator | 18.5-24.9 | ≥30 |
+| HbA1c Level | Numeric | Long-term glucose control | &lt;5.7% | ≥6.5% |
+| Blood Glucose | Numeric | Current glucose level | &lt;100 mg/dL | ≥126 mg/dL |
+
+## 1. Gender
+
+### Description
+
+Biological sex of the patient.
+
+<Tabs>
+  <Tab title="Medical Significance">
+    **Why Gender Matters for Diabetes:**
+    
+    - **Hormonal Differences**: Estrogen and testosterone affect insulin sensitivity
+    - **Body Composition**: Men tend to accumulate visceral fat (higher diabetes risk)
+    - **Prevalence**: Slightly higher diabetes rates in men in some populations
+    - **Complications**: Women with diabetes have higher cardiovascular mortality
+    
+    **Research Notes:**
+    - Type 2 diabetes is ~1.5x more common in men
+    - Women with PCOS (polycystic ovary syndrome) have elevated risk
+    - Gestational diabetes increases future type 2 risk in women
+  </Tab>
+  
+  <Tab title="Data Format">
+    **Categorical Values:**
+    ```json
+    "Female" | "Male" | "Other"
+    ```
+    
+    **Encoded Values:**
+    ```python
+    {
+      "Female": 0,
+      "Male": 1,
+      "Other": 2
+    }
+    ```
+    
+    **Distribution** (typical):
+    - Female: ~50%
+    - Male: ~50%
+    - Other: &lt;1%
+  </Tab>
+  
+  <Tab title="Example Cases">
+    ```json
+    {
+      "gender": "Female",
+      "age": 45,
+      // More features...
+    }
+    ```
+    
+    ```json
+    {
+      "gender": "Male",
+      "age": 55,
+      // More features...
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## 2. Age
+
+### Description
+
+Patient's age in years.
+
+### Clinical Significance
+
+<CardGroup cols={2}>
+  <Card title="Risk Progression" icon="chart-line">
+    Diabetes risk increases dramatically after age 45, with peak incidence in 65-79 age group
+  </Card>
+  
+  <Card title="Physiological Changes" icon="dna">
+    Aging causes decreased insulin secretion, increased insulin resistance, and reduced beta-cell function
+  </Card>
+</CardGroup>
+
+### Age-Related Risk Factors
+
+```
+Age Range    | Diabetes Risk | Contributing Factors
+-------------|---------------|---------------------
+< 30 years   | Low           | Peak metabolic function
+30-44 years  | Moderate      | Lifestyle factors emerge
+45-64 years  | High          | Insulin resistance increases
+65+ years    | Very High     | Multiple comorbidities
+```
+
+### Medical Context
+
+<Accordion title="Why Age Increases Diabetes Risk">
+  1. **Beta-Cell Decline**: Pancreatic beta cells produce less insulin with age
+  2. **Increased Visceral Fat**: Abdominal fat accumulation worsens with age
+  3. **Mitochondrial Dysfunction**: Cellular energy metabolism becomes less efficient
+  4. **Chronic Inflammation**: Age-related inflammation affects insulin signaling
+  5. **Sarcopenia**: Muscle loss reduces glucose disposal capacity
+</Accordion>
+
+### Data Format
+
+<CodeGroup>
+```json API Request
+{
+  "age": 36,
+  // Integer, typically 0-120
+}
+```
+
+```python CSV Format
+age
+36.0
+54.0
+80.0
+# Float64 in CSV
+```
+</CodeGroup>
+
+### Example Risk Profiles
+
+<Tabs>
+  <Tab title="Low Risk (Young)">
+    ```json
+    {
+      "age": 28,
+      "bmi": 22.0,
+      "HbA1c_level": 4.9
+    }
+    ```
+    
+    **Assessment**: Young age is protective even with other risk factors present
+  </Tab>
+  
+  <Tab title="Moderate Risk (Middle Age)">
+    ```json
+    {
+      "age": 45,
+      "bmi": 28.5,
+      "HbA1c_level": 5.8
+    }
+    ```
+    
+    **Assessment**: Age 45+ is a screening threshold in clinical guidelines
+  </Tab>
+  
+  <Tab title="High Risk (Elderly)">
+    ```json
+    {
+      "age": 70,
+      "bmi": 30.0,
+      "HbA1c_level": 6.0
+    }
+    ```
+    
+    **Assessment**: Elderly patients need careful monitoring even with borderline values
+  </Tab>
+</Tabs>
+
+## 3. Hypertension
+
+### Description
+
+Indicates whether the patient has been diagnosed with high blood pressure.
+
+### Clinical Significance
+
+Hypertension and diabetes frequently co-occur in **metabolic syndrome**:
+
+<Steps>
+  <Step title="Shared Pathophysiology">
+    Both conditions involve:
+    - Insulin resistance
+    - Endothelial dysfunction
+    - Chronic inflammation
+    - Sympathetic nervous system overactivity
+  </Step>
+  
+  <Step title="Bidirectional Risk">
+    - Hypertension increases diabetes risk by 2-3x
+    - Diabetes increases hypertension risk
+    - Together, they amplify cardiovascular complications
+  </Step>
+  
+  <Step title="Clinical Impact">
+    Patients with both conditions face:
+    - 3-4x higher stroke risk
+    - 2-3x higher heart attack risk
+    - Accelerated kidney damage
+    - Increased retinopathy (eye damage)
+  </Step>
+</Steps>
+
+### Medical Definition
+
+**Hypertension Diagnosis:**
+- Systolic BP ≥ 140 mmHg, OR
+- Diastolic BP ≥ 90 mmHg
+- Measured on multiple occasions
+
+### Data Format
+
+```json
+{
+  "hypertension": 0  // 0 = No, 1 = Yes
+}
+```
+
+**Binary Values:**
+- `0`: No hypertension diagnosis
+- `1`: Has hypertension
+
+### Prevalence
+
+<Info>
+  **Co-occurrence**: ~75% of people with diabetes also have hypertension
+  
+  **In Dataset**: Approximately 7-10% of patients have hypertension=1
+</Info>
+
+## 4. Heart Disease
+
+### Description
+
+Indicates whether the patient has been diagnosed with cardiovascular disease.
+
+### Clinical Significance
+
+Heart disease and diabetes share common risk factors and mechanisms:
+
+<CardGroup cols={2}>
+  <Card title="Atherosclerosis" icon="heart-crack">
+    Both conditions accelerate plaque buildup in arteries through oxidative stress and inflammation
+  </Card>
+  
+  <Card title="Metabolic Syndrome" icon="chart-network">
+    Heart disease, diabetes, hypertension, and obesity cluster together in metabolic syndrome
+  </Card>
+</CardGroup>
+
+### Relationship with Diabetes
+
+<Accordion title="Why Heart Disease Predicts Diabetes">
+  1. **Shared Etiology**: Both stem from insulin resistance and metabolic dysfunction
+  2. **Inflammatory State**: Cardiovascular inflammation impairs insulin signaling
+  3. **Endothelial Dysfunction**: Damaged blood vessel lining affects glucose metabolism
+  4. **Medication Effects**: Some cardiac medications (beta-blockers, thiazides) can worsen glucose control
+</Accordion>
+
+### Data Format
+
+```json
+{
+  "heart_disease": 0  // 0 = No, 1 = Yes
+}
+```
+
+**Binary Values:**
+- `0`: No heart disease diagnosis
+- `1`: Has heart disease (CAD, MI, CHF, etc.)
+
+### Clinical Implications
+
+<Warning>
+  **High-Risk Combination**: Patients with both diabetes and heart disease require aggressive management:
+  
+  - Tight blood sugar control (HbA1c < 7%)
+  - Blood pressure < 130/80 mmHg
+  - LDL cholesterol < 70 mg/dL
+  - Antiplatelet therapy
+  - ACE inhibitors or ARBs
+</Warning>
+
+## 5. Smoking History
+
+### Description
+
+Patient's smoking status and history.
+
+### Clinical Significance
+
+Smoking affects diabetes risk through multiple mechanisms:
+
+<Steps>
+  <Step title="Insulin Resistance">
+    Nicotine and other toxins impair insulin signaling, increasing blood glucose
+  </Step>
+  
+  <Step title="Inflammation">
+    Smoking triggers chronic systemic inflammation, a key driver of metabolic disease
+  </Step>
+  
+  <Step title="Abdominal Fat">
+    Smokers tend to accumulate visceral fat, the most metabolically harmful type
+  </Step>
+  
+  <Step title="Beta-Cell Toxicity">
+    Smoking may directly damage insulin-producing pancreatic cells
+  </Step>
+</Steps>
+
+### Categories
+
+<Tabs>
+  <Tab title="No Info (0)">
+    **Code**: 0
+    
+    **Meaning**: Smoking history not available or not documented
+    
+    **Clinical Handling**: Assume unknown risk; request information if possible
+  </Tab>
+  
+  <Tab title="Current (1)">
+    **Code**: 1
+    
+    **Meaning**: Currently smokes (daily or most days)
+    
+    **Risk**: **Highest** - Active smoking increases diabetes risk by 30-40%
+    
+    **Recommendation**: Smoking cessation is a priority intervention
+  </Tab>
+  
+  <Tab title="Ever (2)">
+    **Code**: 2
+    
+    **Meaning**: Has smoked at some point in life (ambiguous duration/quit status)
+    
+    **Risk**: Moderate - history indicates exposure but unclear current impact
+  </Tab>
+  
+  <Tab title="Former (3)">
+    **Code**: 3
+    
+    **Meaning**: Former smoker who has quit
+    
+    **Risk**: Elevated initially, decreases with time since quitting
+    
+    **Note**: Risk returns to near-baseline after 10-15 years smoke-free
+  </Tab>
+  
+  <Tab title="Never (4)">
+    **Code**: 4
+    
+    **Meaning**: Never smoked
+    
+    **Risk**: **Lowest** - No smoking-related diabetes risk
+  </Tab>
+  
+  <Tab title="Not Current (5)">
+    **Code**: 5
+    
+    **Meaning**: Not currently smoking (may have smoked in past)
+    
+    **Risk**: Lower than current, but history unclear
+  </Tab>
+</Tabs>
+
+### Data Format
+
+<CodeGroup>
+```json API Request (String)
+{
+  "smoking_history": "current"
+  // Options: "No Info", "current", "ever", "former", "never", "not current"
+}
+```
+
+```python After Encoding (Integer)
+{
+  "smoking_history": 1
+  // 0-5 corresponding to categories above
+}
+```
+</CodeGroup>
+
+### Risk Quantification
+
+**Relative Diabetes Risk by Smoking Status:**
+
+```
+Smoking Status    | Relative Risk | Compared to Never Smokers
+------------------|---------------|---------------------------
+Never             | 1.0x          | Baseline
+Former (quit >10y)| 1.1x          | Nearly baseline
+Former (quit <10y)| 1.2x          | Slightly elevated
+Current (light)   | 1.3x          | Moderate increase
+Current (heavy)   | 1.5x          | Significant increase
+```
+
+## 6. BMI (Body Mass Index)
+
+### Description
+
+A measure of body fat based on height and weight: BMI = weight (kg) / height² (m²)
+
+### Clinical Significance
+
+<Warning>
+  **Most Important Modifiable Risk Factor**: Obesity is the single strongest predictor of type 2 diabetes, with BMI ≥30 increasing risk by 7-10x.
+</Warning>
+
+### BMI Categories
+
+<Tabs>
+  <Tab title="Classification">
+    | BMI Range | Category | Diabetes Risk |
+    |-----------|----------|---------------|
+    | < 18.5 | Underweight | Low |
+    | 18.5 - 24.9 | Normal Weight | **Baseline (1x)** |
+    | 25.0 - 29.9 | Overweight | 2-3x |
+    | 30.0 - 34.9 | Obese (Class I) | 5-7x |
+    | 35.0 - 39.9 | Obese (Class II) | 7-10x |
+    | ≥ 40.0 | Obese (Class III) | 10-12x |
+  </Tab>
+  
+  <Tab title="Pathophysiology">
+    **Why Obesity Causes Diabetes:**
+    
+    1. **Insulin Resistance**
+       - Excess fat (especially visceral) releases inflammatory cytokines
+       - These block insulin receptors on cells
+       - Glucose can't enter cells effectively
+    
+    2. **Ectopic Fat**
+       - Fat accumulates in liver, muscle, pancreas
+       - Directly impairs insulin production and action
+    
+    3. **Adipokine Dysregulation**
+       - Decreased adiponectin (insulin-sensitizing)
+       - Increased leptin resistance
+       - Increased resistin and TNF-α
+    
+    4. **Beta-Cell Exhaustion**
+       - Pancreas overworks to overcome resistance
+       - Eventually fails to produce enough insulin
+  </Tab>
+  
+  <Tab title="Clinical Thresholds">
+    **Screening Recommendations:**
+    
+    - BMI ≥ 25: Screen for diabetes if other risk factors present
+    - BMI ≥ 23 (Asian): Lower threshold for Asian populations
+    - BMI ≥ 30: Screen all patients regardless of other factors
+    
+    **Treatment Goals:**
+    
+    - 5-10% weight loss reduces diabetes risk by 50%
+    - Bariatric surgery (BMI ≥ 35) can reverse diabetes in 60-80% of cases
+  </Tab>
+</Tabs>
+
+### Data Format
+
+```json
+{
+  "bmi": 32.27
+  // Float, typical range 10-95
+}
+```
+
+**Example Calculations:**
+
+```python
+# BMI = weight (kg) / height² (m²)
+
+# Example 1: Normal weight
+weight = 70  # kg
+height = 1.75  # meters
+bmi = 70 / (1.75 ** 2) = 22.86
+# Classification: Normal
+
+# Example 2: Obese
+weight = 95  # kg
+height = 1.70  # meters
+bmi = 95 / (1.70 ** 2) = 32.87
+# Classification: Obese Class I
+```
+
+### Example Profiles
+
+<CodeGroup>
+```json Low Risk (Normal BMI)
+{
+  "bmi": 22.5,
+  "age": 30,
+  "HbA1c_level": 5.0
+}
+// Prediction: Likely no diabetes
+```
+
+```json High Risk (Obese)
+{
+  "bmi": 35.5,
+  "age": 50,
+  "HbA1c_level": 6.0
+}
+// Prediction: High diabetes risk
+```
+</CodeGroup>
+
+## 7. HbA1c Level (Hemoglobin A1c)
+
+### Description
+
+Average blood glucose level over the past 2-3 months, expressed as a percentage.
+
+### Clinical Significance
+
+<Info>
+  **Gold Standard**: HbA1c is the primary diagnostic test for diabetes and the best indicator of long-term glucose control.
+</Info>
+
+### How HbA1c Works
+
+<Accordion title="Biochemistry">
+  **Glycation Process:**
+  
+  1. Glucose in blood binds to hemoglobin in red blood cells
+  2. Higher blood glucose → more glucose-hemoglobin binding (glycation)
+  3. Red blood cells live ~120 days, so HbA1c reflects 2-3 month average
+  4. Measured as percentage of hemoglobin that's glycated
+  
+  **Advantages:**
+  - Not affected by recent meals (fasting not required)
+  - Stable day-to-day
+  - Reflects long-term control
+  - Strong predictor of complications
+</Accordion>
+
+### Diagnostic Thresholds
+
+<Tabs>
+  <Tab title="Classification">
+    | HbA1c Level | Category | Interpretation |
+    |-------------|----------|----------------|
+    | < 5.7% | **Normal** | Healthy glucose metabolism |
+    | 5.7% - 6.4% | **Prediabetes** | Impaired glucose tolerance; reversible |
+    | ≥ 6.5% | **Diabetes** | Diagnostic for diabetes (if confirmed) |
+    | ≥ 8.0% | **Poorly Controlled** | Urgent intervention needed |
+    | ≥ 9.0% | **Very Poor Control** | High complication risk |
+  </Tab>
+  
+  <Tab title="Risk Stratification">
+    **HbA1c and Diabetes Risk:**
+    
+    ```
+    HbA1c    | 5-Year Diabetes Risk
+    ---------|----------------------
+    < 5.0%   | < 1%
+    5.0-5.4% | 5%
+    5.5-5.9% | 10%
+    6.0-6.4% | 25-50%
+    ≥ 6.5%   | Diabetes (diagnosed)
+    ```
+  </Tab>
+  
+  <Tab title="Treatment Targets">
+    **For Patients with Diabetes:**
+    
+    - **Standard Goal**: HbA1c < 7.0%
+    - **Intensive Goal**: HbA1c < 6.5% (if low hypoglycemia risk)
+    - **Relaxed Goal**: HbA1c < 8.0% (elderly, comorbidities)
+    
+    **Impact of Control:**
+    - Each 1% reduction in HbA1c reduces complications by 20-30%
+  </Tab>
+</Tabs>
+
+### Data Format
+
+```json
+{
+  "HbA1c_level": 6.2
+  // Float, typically 3.5-15.0
+  // Expressed as percentage
+}
+```
+
+### Conversion to Average Glucose
+
+**Estimated Average Glucose (eAG):**
+
+```
+eAG (mg/dL) = 28.7 × HbA1c - 46.7
+
+Examples:
+HbA1c 5.0% → eAG = 97 mg/dL (normal)
+HbA1c 6.0% → eAG = 126 mg/dL (prediabetic)
+HbA1c 7.0% → eAG = 154 mg/dL (diabetic)
+HbA1c 8.0% → eAG = 183 mg/dL (poorly controlled)
+```
+
+### Example Risk Profiles
+
+<CodeGroup>
+```json Normal (5.0%)
+{
+  "HbA1c_level": 5.0,
+  "blood_glucose_level": 95
+}
+// Assessment: Healthy glucose metabolism
+```
+
+```json Prediabetic (6.0%)
+{
+  "HbA1c_level": 6.0,
+  "blood_glucose_level": 110
+}
+// Assessment: Prediabetes; lifestyle intervention recommended
+```
+
+```json Diabetic (7.2%)
+{
+  "HbA1c_level": 7.2,
+  "blood_glucose_level": 180
+}
+// Assessment: Diabetes; medication likely needed
+```
+</CodeGroup>
+
+<Warning>
+  **Critical Note**: HbA1c ≥ 6.5% is diagnostic for diabetes when confirmed with repeat testing. Patients with values in this range should be immediately flagged for clinical evaluation.
+</Warning>
+
+## 8. Blood Glucose Level
+
+### Description
+
+Current blood glucose (sugar) concentration, measured in mg/dL (milligrams per deciliter).
+
+### Clinical Significance
+
+<CardGroup cols={2}>
+  <Card title="Snapshot Measurement" icon="camera">
+    Unlike HbA1c (2-3 month average), blood glucose shows current glucose level at time of measurement
+  </Card>
+  
+  <Card title="State-Dependent" icon="clock">
+    Interpretation depends on when measured: fasting, post-meal, random, etc.
+  </Card>
+</CardGroup>
+
+### Diagnostic Thresholds
+
+<Tabs>
+  <Tab title="Fasting Glucose">
+    **Measured after 8+ hours without food:**
+    
+    | Glucose Level | Category | Interpretation |
+    |---------------|----------|----------------|
+    | < 100 mg/dL | **Normal** | Healthy glucose regulation |
+    | 100-125 mg/dL | **Prediabetes** | Impaired fasting glucose |
+    | ≥ 126 mg/dL | **Diabetes** | Diagnostic if confirmed |
+    
+    <Info>
+      **Dataset Context**: The dataset doesn't specify fasting status, so interpretation requires caution.
+    </Info>
+  </Tab>
+  
+  <Tab title="Random Glucose">
+    **Measured at any time, regardless of meals:**
+    
+    | Glucose Level | Category | Interpretation |
+    |---------------|----------|----------------|
+    | < 140 mg/dL | Usually Normal | But depends on meal timing |
+    | 140-199 mg/dL | Elevated | Warrants further testing |
+    | ≥ 200 mg/dL | **Diabetes** | Diagnostic if symptomatic |
+    
+    **Note**: Random glucose ≥ 200 mg/dL with symptoms (thirst, urination, weight loss) is diagnostic for diabetes.
+  </Tab>
+  
+  <Tab title="Oral Glucose Tolerance Test">
+    **Measured 2 hours after 75g glucose drink:**
+    
+    | Glucose Level | Category | Interpretation |
+    |---------------|----------|----------------|
+    | < 140 mg/dL | Normal | Normal glucose tolerance |
+    | 140-199 mg/dL | Prediabetes | Impaired glucose tolerance |
+    | ≥ 200 mg/dL | Diabetes | Diagnostic |
+  </Tab>
+</Tabs>
+
+### Data Format
+
+```json
+{
+  "blood_glucose_level": 220
+  // Integer, typically 60-400 mg/dL
+}
+```
+
+### Clinical Ranges
+
+```
+Glucose Range     | Clinical Meaning           | Action
+------------------|----------------------------|------------------
+< 70 mg/dL        | Hypoglycemia               | Immediate treatment
+70-99 mg/dL       | Normal (fasting)           | No action
+100-125 mg/dL     | Prediabetes (fasting)      | Lifestyle counseling
+126-139 mg/dL     | Diabetes (fasting)         | Confirm diagnosis
+140-199 mg/dL     | Elevated (random)          | Further testing
+200-250 mg/dL     | Hyperglycemia              | Medical evaluation
+> 250 mg/dL       | Severe hyperglycemia       | Urgent care
+> 600 mg/dL       | Hyperosmolar state         | Emergency
+```
+
+### Relationship with HbA1c
+
+Blood glucose and HbA1c should correlate:
+
+<CodeGroup>
+```json Consistent (Low Risk)
+{
+  "HbA1c_level": 5.0,
+  "blood_glucose_level": 90
+}
+// Both normal - consistent story
+```
+
+```json Consistent (High Risk)
+{
+  "HbA1c_level": 7.5,
+  "blood_glucose_level": 200
+}
+// Both diabetic - consistent story
+```
+
+```json Inconsistent (Concerning)
+{
+  "HbA1c_level": 5.2,
+  "blood_glucose_level": 220
+}
+// Normal HbA1c but very high current glucose
+// Possible: Post-meal spike, acute illness, or measurement error
+```
+</CodeGroup>
+
+### Example Patient Cases
+
+<Tabs>
+  <Tab title="Case 1: Normal">
+    ```json
+    {
+      "blood_glucose_level": 85,
+      "HbA1c_level": 4.9,
+      "bmi": 22.0,
+      "age": 30
+    }
+    ```
+    
+    **Assessment**: Healthy glucose levels, low diabetes risk
+  </Tab>
+  
+  <Tab title="Case 2: Prediabetic">
+    ```json
+    {
+      "blood_glucose_level": 115,
+      "HbA1c_level": 5.9,
+      "bmi": 28.5,
+      "age": 48
+    }
+    ```
+    
+    **Assessment**: Prediabetic range; intensive lifestyle intervention recommended
+  </Tab>
+  
+  <Tab title="Case 3: Diabetic">
+    ```json
+    {
+      "blood_glucose_level": 220,
+      "HbA1c_level": 8.2,
+      "bmi": 34.0,
+      "age": 55
+    }
+    ```
+    
+    **Assessment**: Poorly controlled diabetes; medication adjustment needed
+  </Tab>
+</Tabs>
+
+## Feature Interactions
+
+The model considers combinations of features:
+
+### High-Risk Combinations
+
+<Warning>
+  **Metabolic Syndrome Profile:**
+  
+  ```json
+  {
+    "bmi": 32,              // Obese
+    "hypertension": 1,       // High BP
+    "blood_glucose_level": 120,  // Elevated
+    "age": 55               // Middle age
+  }
+  ```
+  
+  All four components of metabolic syndrome present → Very high diabetes risk
+</Warning>
+
+### Protective Combinations
+
+<Tip>
+  **Low-Risk Profile:**
+  
+  ```json
+  {
+    "age": 28,
+    "bmi": 21.5,
+    "smoking_history": "never",
+    "hypertension": 0,
+    "HbA1c_level": 4.8
+  }
+  ```
+  
+  Young, healthy weight, non-smoker with excellent glucose control
+</Tip>
+
+## Clinical Applications
+
+### Screening Decisions
+
+Use feature values to determine screening intervals:
+
+```python
+if age >= 45 or (age >= 35 and bmi >= 25):
+    screen_now = True
+    interval = "Every 3 years if normal"
+else:
+    screen_now = False
+    interval = "Wait until age 45"
+```
+
+### Intervention Priorities
+
+Focus interventions based on modifiable features:
+
+1. **BMI**: Weight loss is first-line intervention
+2. **Smoking**: Cessation reduces risk and complications
+3. **Blood Pressure**: Control hypertension if present
+4. **Glucose**: Lifestyle changes to lower HbA1c
+
+**Non-modifiable** (focus on monitoring):
+- Age
+- Gender
+- Heart disease history
+
+## Summary: Feature Importance
+
+Based on medical literature and model feature importance:
+
+```
+Rank | Feature            | Modifiable | Impact
+-----|--------------------|-----------|---------
+1    | HbA1c_level        | Yes       | Very High
+2    | blood_glucose      | Yes       | Very High
+3    | bmi                | Yes       | High
+4    | age                | No        | High
+5    | hypertension       | Partial   | Moderate
+6    | smoking_history    | Yes       | Moderate
+7    | heart_disease      | Partial   | Moderate
+8    | gender             | No        | Low
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Model Architecture" icon="sitemap" href="/concepts/model-architecture">
+    Learn how these features are used in the RandomForest model
+  </Card>
+  
+  <Card title="Data Preprocessing" icon="filter" href="/concepts/data-preprocessing">
+    Understand how features are encoded and scaled
+  </Card>
+  
+  <Card title="Dataset Overview" icon="database" href="/overview/dataset">
+    See the full dataset structure and distribution
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/getting-started/quickstart">
+    Start making predictions with these features
+  </Card>
+</CardGroup>
